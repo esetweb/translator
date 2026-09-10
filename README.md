@@ -52,6 +52,12 @@ language checkbox.
    (`languageId` 1, 2, …). Source = the site's default language, target = an
    overlay language ⇒ standard TYPO3 localization records are created.
 
+   > **v10.4 note:** `DataHandler::localize()` still validates the target
+   > against a `sys_language` record (removed in v11). The extension creates a
+   > matching `sys_language` record on demand — a one‑time bootstrap keyed by
+   > `languageId` — so overlay languages defined only in `config.yaml` work
+   > without a manually created "Website Language" record.
+
 For a copied page the source language is guessed automatically from
 `t3_origuid` (the record TYPO3 stamps on copy) → the extension config
 `defaultSourceLanguage` → the page's own site language. The editor can always

@@ -10,6 +10,7 @@ use ESET\Translator\Domain\Dto\TranslationTarget;
 use ESET\Translator\Domain\Dto\TranslationUnit;
 use ESET\Translator\Domain\Model\Job;
 use ESET\Translator\Format\FormatRegistry;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -36,18 +37,23 @@ class ImportService
     /** @var ConfigurationService */
     protected $configuration;
 
+    /** @var ConnectionPool */
+    protected $connectionPool;
+
     public function __construct(
         FormatRegistry $formatRegistry,
         RecordCollectorService $recordCollector,
         PermissionService $permissionService,
         SiteLanguageService $siteLanguageService,
-        ConfigurationService $configuration
+        ConfigurationService $configuration,
+        ConnectionPool $connectionPool
     ) {
         $this->formatRegistry = $formatRegistry;
         $this->recordCollector = $recordCollector;
         $this->permissionService = $permissionService;
         $this->siteLanguageService = $siteLanguageService;
         $this->configuration = $configuration;
+        $this->connectionPool = $connectionPool;
     }
 
     /**
@@ -156,6 +162,12 @@ class ImportService
             return (int)$existing['uid'];
         }
 
+        // v10.4 DataHandler::localize() validates the target language against a
+        // sys_language record (removed in v11, which reads the site config). Site
+        // languages defined only in config.yaml have no such record, so create a
+        // matching one on demand - a one-time bootstrap, keyed by languageId.
+        $this->ensureSysLanguageRecord($target);
+
         $dataHandler = $this->executeDataHandler([], [
             $table => [
                 $uid => ['localize' => $target->getLanguageId()],
@@ -172,6 +184,33 @@ class ImportService
         }
 
         return $newUid;
+    }
+
+    /**
+     * Ensures a sys_language record exists with uid == the site language id, so
+     * v10.4's DataHandler::localize() accepts it. No-op for languageId 0 and for
+     * ids that already have a record.
+     */
+    protected function ensureSysLanguageRecord(TranslationTarget $target): void
+    {
+        $languageId = $target->getLanguageId();
+        if ($languageId <= 0) {
+            return;
+        }
+        $connection = $this->connectionPool->getConnectionForTable('sys_language');
+        $exists = $connection->count('uid', 'sys_language', ['uid' => $languageId]);
+        if ($exists > 0) {
+            return;
+        }
+        $connection->insert('sys_language', [
+            'uid' => $languageId,
+            'pid' => 0,
+            'tstamp' => $GLOBALS['EXEC_TIME'] ?? time(),
+            'hidden' => 0,
+            'title' => $target->getTitle() !== '' ? $target->getTitle() : ('Language ' . $languageId),
+            'flag' => $target->getIsoCode() !== '' ? $target->getIsoCode() : 'multiple',
+            'language_isocode' => $target->getIsoCode(),
+        ]);
     }
 
     /**
