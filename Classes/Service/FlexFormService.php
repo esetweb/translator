@@ -194,7 +194,13 @@ class FlexFormService
                 if (!empty($elementConfig['section']) || (string)($elementConfig['type'] ?? '') === 'array') {
                     continue;
                 }
-                $config = (array)($elementConfig['config'] ?? []);
+                // v10.4 does NOT unwrap the legacy <TCEforms> element - label and
+                // config still sit one level deeper for DS written that way
+                // (common in gridelements layouts and hand-written structures).
+                $element = isset($elementConfig['TCEforms']) && is_array($elementConfig['TCEforms'])
+                    ? $elementConfig['TCEforms']
+                    : $elementConfig;
+                $config = (array)($element['config'] ?? []);
                 if (!$this->isTranslatableConfig($config)) {
                     continue;
                 }
@@ -202,7 +208,7 @@ class FlexFormService
                     'sheet' => (string)$sheetName,
                     'name' => (string)$elementName,
                     'html' => !empty($config['enableRichtext']),
-                    'label' => $this->resolveLabel((string)($elementConfig['label'] ?? ''), (string)$elementName),
+                    'label' => $this->resolveLabel((string)($element['label'] ?? ''), (string)$elementName),
                 ];
             }
         }
