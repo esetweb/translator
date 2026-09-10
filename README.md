@@ -159,12 +159,30 @@ Install Tool → **Settings → Extension Configuration → eset_translator**:
 | `providerTimeout` | `30` | provider HTTP timeout (s) |
 | `storageFolder` | `typo3temp/var/eset_translator` | where generated files are kept |
 | `translatableTables` | `pages,tt_content` | tables scanned for translatable fields |
-| `excludedFields` | `pages.slug,pages.alias,pages.url,tt_content.pi_flexform` | `table.field` (or `*.field`) never exported |
+| `excludedFields` | `pages.slug,pages.alias,pages.url,pages.tx_esettranslator_note` | `table.field` (or `*.field`) never exported. Also skips a whole FlexForm column when listed (e.g. `tt_content.pi_flexform`). |
 | `excludedCTypes` | `html` | `tt_content` CType values skipped by default (e.g. raw HTML embeds). Pre‑unchecked in the wizard's "content types" list; the editor can re‑include them per request. |
+| `translateFlexForm` | `1` | collect translatable text from FlexForm option sheets (plugin / grid‑element settings in `pi_flexform`) |
 
 A field is treated as translatable when it is TCA type `input`/`text`, not
 `readOnly`, not `l10n_mode = exclude`, not `allowLanguageSynchronization`, and
 not a non‑text `eval` (int, date, password, …) or link/colour picker.
+
+### FlexForm content
+
+Custom plugins and grid elements often keep their editable labels (headers,
+button text, claims) in `pi_flexform` option sheets rather than in real DB
+columns. With `translateFlexForm = 1` those leaves are collected too: each one
+becomes a unit whose field is a path `pi_flexform/<sheet>/<fieldname>`, using the
+same input/text rules as above, and is written back through DataHandler so RTE
+transformation and history behave normally. The data structure is resolved per
+record (via its `CType` / `list_type`), so it works with `flux`, `gridelements`,
+`container` and hand‑written DS alike. `onlyUntranslated` compares each leaf
+against the copy origin (in place) or the overlay record (overlay), like scalar
+fields.
+
+Not handled: FlexForm **sections/containers** and language‑split flex
+(`langChildren` / `vDA`). Add `tt_content.pi_flexform` back to `excludedFields`,
+or set `translateFlexForm = 0`, to turn the feature off.
 
 ---
 
@@ -308,6 +326,7 @@ TCA. The format then shows up in the wizard and the `defaultFormat` setting.
 | Want to… | How |
 |----------|-----|
 | Scan more tables / skip fields | `translatableTables` / `excludedFields` extension config |
+| Turn FlexForm translation on/off | `translateFlexForm` extension config (or list the column in `excludedFields`) |
 | Change job list / detail templates | TypoScript `module.tx_esettranslator.view.templateRootPaths.10 = …` |
 | Change the context‑menu labels or hide the submenu for a subtree | page TSconfig `options.contextMenu.table.pages.disableItems = eset` |
 | Restrict a group's targets beyond page mounts | user TSconfig `tx_esettranslator.*` (section 5) |

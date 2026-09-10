@@ -83,8 +83,17 @@ class ConfigurationService
             'pages.alias',
             'pages.url',
             'pages.tx_esettranslator_note',
-            'tt_content.pi_flexform',
         ]);
+    }
+
+    /**
+     * Whether translatable leaves inside FlexForm columns (pi_flexform option
+     * sheets of plugins / grid elements) are collected. On by default; the
+     * per-column {@see getExcludedFields()} list still applies.
+     */
+    public function isFlexFormTranslationEnabled(): bool
+    {
+        return $this->getBool('translateFlexForm', true);
     }
 
     public function isFieldExcluded(string $table, string $field): bool

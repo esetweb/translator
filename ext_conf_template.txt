@@ -52,8 +52,11 @@ defaultSourceLanguage = us:0
 # cat=basic/records/010; type=string; label=Translatable tables: Comma separated list of tables scanned for translatable fields.
 translatableTables = pages,tt_content
 
-# cat=basic/records/020; type=string; label=Excluded fields: Comma separated "table.field" entries never exported.
-excludedFields = pages.slug,pages.alias,pages.url,tt_content.pi_flexform
+# cat=basic/records/020; type=string; label=Excluded fields: Comma separated "table.field" entries never exported. Also applies to FlexForm columns (e.g. tt_content.pi_flexform) to skip them entirely.
+excludedFields = pages.slug,pages.alias,pages.url,pages.tx_esettranslator_note
 
 # cat=basic/records/030; type=string; label=Excluded content types: Comma separated tt_content CType values skipped by default (e.g. html). The editor can re-include them per request.
 excludedCTypes = html
+
+# cat=basic/records/040; type=boolean; label=Translate FlexForm content: Collect translatable text from FlexForm option sheets of plugins and grid elements (tt_content.pi_flexform). Flat sheets only; sections are skipped.
+translateFlexForm = 1

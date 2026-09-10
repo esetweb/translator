@@ -31,14 +31,19 @@ class RecordCollectorService
     /** @var SiteLanguageService */
     protected $siteLanguageService;
 
+    /** @var FlexFormService */
+    protected $flexFormService;
+
     public function __construct(
         ConnectionPool $connectionPool,
         ConfigurationService $configuration,
-        SiteLanguageService $siteLanguageService
+        SiteLanguageService $siteLanguageService,
+        FlexFormService $flexFormService
     ) {
         $this->connectionPool = $connectionPool;
         $this->configuration = $configuration;
         $this->siteLanguageService = $siteLanguageService;
+        $this->flexFormService = $flexFormService;
     }
 
     /**
@@ -316,6 +321,103 @@ class RecordCollectorService
             }
             $dataSet->addUnit($unit);
         }
+
+        $this->addFlexFormUnits($dataSet, $table, $record, $target, $onlyUntranslated, $existingTranslation, $pageUid);
+    }
+
+    /**
+     * Emits a unit per translatable FlexForm leaf (plugin / grid-element option
+     * sheets). The unit field is a path "<column>/<sheet>/<name>" that round
+     * trips through the exchange files unchanged.
+     *
+     * @param array<string, mixed> $record
+     * @param array<string, mixed>|null $existingTranslation
+     */
+    protected function addFlexFormUnits(
+        TranslationDataSet $dataSet,
+        string $table,
+        array $record,
+        TranslationTarget $target,
+        bool $onlyUntranslated,
+        ?array $existingTranslation,
+        int $pageUid
+    ): void {
+        if (!$this->configuration->isFlexFormTranslationEnabled()) {
+            return;
+        }
+        $uid = (int)$record['uid'];
+
+        foreach ($this->flexFormService->getFlexFormColumns($table) as $column) {
+            $overlayMap = $existingTranslation !== null
+                ? $this->flexFormService->valueMap($table, $column, $existingTranslation)
+                : [];
+            $originMap = null;
+
+            foreach ($this->flexFormService->extract($table, $column, $record) as $leaf) {
+                $value = $leaf['value'];
+                if ($onlyUntranslated) {
+                    // Overlay: the overlay record already holds a different value.
+                    $overlayValue = $overlayMap[$leaf['path']] ?? '';
+                    if ($overlayValue !== '' && $overlayValue !== $value) {
+                        continue;
+                    }
+                    // In place (languageId 0): translated since the copy, or a
+                    // previous ESET import already wrote exactly this value.
+                    if ($target->getLanguageId() === 0) {
+                        if ($originMap === null) {
+                            $originMap = $this->flexFormCopyOriginMap($table, $record, $column);
+                        }
+                        if ((isset($originMap[$leaf['path']]) && $originMap[$leaf['path']] !== $value)
+                            || $this->wasImportedInPlace($table, $uid, $leaf['path'], $value)
+                        ) {
+                            continue;
+                        }
+                    }
+                }
+
+                $unit = new TranslationUnit(
+                    $table,
+                    $uid,
+                    $leaf['path'],
+                    $value,
+                    $leaf['html'],
+                    $leaf['label'],
+                    $pageUid
+                );
+                if ($existingTranslation !== null) {
+                    $unit->setTargetUid((int)$existingTranslation['uid']);
+                }
+                if ($table === 'tt_content' && isset($record['CType'])) {
+                    $unit->setMetaData('CType', (string)$record['CType']);
+                }
+                $dataSet->addUnit($unit);
+            }
+        }
+    }
+
+    /**
+     * path => value map of the record this one was copied from (t3_origuid),
+     * for the FlexForm column. Empty when the record is not a copy.
+     *
+     * @param array<string, mixed> $record
+     * @return array<string, string>
+     */
+    protected function flexFormCopyOriginMap(string $table, array $record, string $column): array
+    {
+        $origUidField = (string)($GLOBALS['TCA'][$table]['ctrl']['origUid'] ?? '');
+        if ($origUidField === '') {
+            return [];
+        }
+        $originUid = (int)($record[$origUidField] ?? 0);
+        if ($originUid <= 0 || $originUid === (int)$record['uid']) {
+            return [];
+        }
+        $origin = BackendUtility::getRecord($table, $originUid);
+        if (!is_array($origin)) {
+            return [];
+        }
+
+        return $this->flexFormService->valueMap($table, $column, $origin);
     }
 
     /**

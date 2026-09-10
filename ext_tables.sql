@@ -31,7 +31,7 @@ CREATE TABLE tx_esettranslator_domain_model_jobitem (
 	job int(11) unsigned DEFAULT '0' NOT NULL,
 	table_name varchar(100) DEFAULT '' NOT NULL,
 	record_uid int(11) unsigned DEFAULT '0' NOT NULL,
-	field_name varchar(100) DEFAULT '' NOT NULL,
+	field_name varchar(255) DEFAULT '' NOT NULL,
 	record_page_uid int(11) unsigned DEFAULT '0' NOT NULL,
 	target_uid int(11) unsigned DEFAULT '0' NOT NULL,
 	source_text mediumtext,

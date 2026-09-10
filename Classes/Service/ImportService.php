@@ -10,6 +10,7 @@ use ESET\Translator\Domain\Dto\TranslationTarget;
 use ESET\Translator\Domain\Dto\TranslationUnit;
 use ESET\Translator\Domain\Model\Job;
 use ESET\Translator\Format\FormatRegistry;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -40,13 +41,17 @@ class ImportService
     /** @var ConnectionPool */
     protected $connectionPool;
 
+    /** @var FlexFormService */
+    protected $flexFormService;
+
     public function __construct(
         FormatRegistry $formatRegistry,
         RecordCollectorService $recordCollector,
         PermissionService $permissionService,
         SiteLanguageService $siteLanguageService,
         ConfigurationService $configuration,
-        ConnectionPool $connectionPool
+        ConnectionPool $connectionPool,
+        FlexFormService $flexFormService
     ) {
         $this->formatRegistry = $formatRegistry;
         $this->recordCollector = $recordCollector;
@@ -54,6 +59,7 @@ class ImportService
         $this->siteLanguageService = $siteLanguageService;
         $this->configuration = $configuration;
         $this->connectionPool = $connectionPool;
+        $this->flexFormService = $flexFormService;
     }
 
     /**
@@ -128,19 +134,43 @@ class ImportService
         }
 
         $translatableFields = $this->recordCollector->getTranslatableFields($table);
+        $targetRow = BackendUtility::getRecord($table, $targetUid) ?: [];
         $values = [];
+        $flexLeaves = [];
+        $imported = 0;
         foreach ($units as $unit) {
             if (!$unit->isTranslated()) {
                 $result->countSkipped();
                 continue;
             }
-            if (!isset($translatableFields[$unit->getField()])) {
+            $field = $unit->getField();
+
+            // FlexForm leaf: field is a "<column>/<sheet>/<name>" path. Validate
+            // it against the target record's real data structure before writing.
+            if ($this->flexFormService->isFlexPath($table, $field)) {
+                [$column, $sheet, $name] = $this->flexFormService->parseFlexPath($field);
+                if (!$this->flexFormService->leafExists($table, $column, $targetRow, $sheet, $name)) {
+                    $result->countSkipped();
+                    continue;
+                }
+                $flexLeaves[$column][] = ['sheet' => $sheet, 'name' => $name, 'value' => $unit->getTargetText()];
+                $unit->setTargetUid($targetUid);
+                $imported++;
+                continue;
+            }
+
+            if (!isset($translatableFields[$field])) {
                 // Never trust field names coming from an uploaded file.
                 $result->countSkipped();
                 continue;
             }
-            $values[$unit->getField()] = $unit->getTargetText();
+            $values[$field] = $unit->getTargetText();
             $unit->setTargetUid($targetUid);
+            $imported++;
+        }
+
+        foreach ($flexLeaves as $column => $leaves) {
+            $values = array_merge($values, $this->flexFormService->buildDataHandlerValue((string)$column, $leaves));
         }
 
         if ($values === []) {
@@ -148,7 +178,7 @@ class ImportService
         }
 
         $this->executeDataHandler([$table => [$targetUid => $values]], []);
-        $result->countImported(count($values));
+        $result->countImported($imported);
     }
 
     protected function resolveOrCreateTranslation(
