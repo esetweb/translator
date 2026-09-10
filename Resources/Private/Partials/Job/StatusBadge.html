@@ -1,0 +1,8 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:spaceless>
+	<f:variable name="labelClass"><f:switch expression="{status}"><f:case value="new">label-default</f:case><f:case value="exported">label-info</f:case><f:case value="queued">label-info</f:case><f:case value="running">label-primary</f:case><f:case value="translated">label-primary</f:case><f:case value="imported">label-success</f:case><f:case value="failed">label-danger</f:case><f:case value="cancelled">label-warning</f:case><f:defaultCase>label-default</f:defaultCase></f:switch></f:variable>
+	<span class="label {labelClass}">
+		<f:translate key="LLL:EXT:eset_translator/Resources/Private/Language/locallang_db.xlf:job.status.{status}">{status}</f:translate>
+	</span>
+</f:spaceless>
+</html>

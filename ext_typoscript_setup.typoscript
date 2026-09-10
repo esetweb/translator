@@ -1,0 +1,14 @@
+module.tx_esettranslator {
+    view {
+        templateRootPaths.0 = EXT:eset_translator/Resources/Private/Templates/
+        partialRootPaths.0 = EXT:eset_translator/Resources/Private/Partials/
+        layoutRootPaths.0 = EXT:eset_translator/Resources/Private/Layouts/
+    }
+    persistence {
+        # Jobs are installation wide records on the root level.
+        storagePid = 0
+    }
+    features {
+        skipDefaultArguments = 0
+    }
+}

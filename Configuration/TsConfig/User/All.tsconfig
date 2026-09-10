@@ -1,0 +1,26 @@
+/**
+ * Default user TSconfig of EXT:eset_translator.
+ *
+ * Language permissions are resolved as "<siteIdentifier>:<languageId>" pairs
+ * because sys_language_uid alone is ambiguous when many sites use languageId 0
+ * for their own localized default language.
+ *
+ * Leaving allowedSources/allowedTargets empty keeps the core behaviour
+ * (be_groups.allowed_languages plus DB mounts).
+ *
+ * Example for an editor who may translate the Czech site into Slovak and
+ * Polish, and may read every default language as source:
+ *
+ *   tx_esettranslator {
+ *       allowedSources = *:0
+ *       allowedTargets = eset-cz:1, eset-cz:2
+ *   }
+ */
+tx_esettranslator {
+    allowedSources =
+    allowedTargets =
+    deniedSources =
+    deniedTargets =
+    ignoreCoreLanguagePermissions = 0
+    allowDefaultLanguageAsTarget = 0
+}

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.0">
+	<file source-language="en" datatype="plaintext" original="messages" date="2026-01-01T00:00:00Z" product-name="eset_translator">
+		<header/>
+		<body>
+			<trans-unit id="button.requestTranslation">
+				<source>Request translation</source>
+			</trans-unit>
+			<trans-unit id="button.exchange">
+				<source>Export / import translation</source>
+			</trans-unit>
+			<trans-unit id="contextMenu.eset">
+				<source>ESET</source>
+			</trans-unit>
+			<trans-unit id="contextMenu.requestTranslation">
+				<source>Request translation</source>
+			</trans-unit>
+			<trans-unit id="contextMenu.exchange">
+				<source>Export / import content for translation</source>
+			</trans-unit>
+			<trans-unit id="contextMenu.jobs">
+				<source>Show translation jobs</source>
+			</trans-unit>
+			<trans-unit id="module.import.noFile">
+				<source>No translation file was uploaded.</source>
+			</trans-unit>
+			<trans-unit id="module.run.notAutomated">
+				<source>This job is a manual export/import job and cannot be sent to a provider.</source>
+			</trans-unit>
+			<trans-unit id="module.run.done">
+				<source>The job has been processed.</source>
+			</trans-unit>
+			<trans-unit id="module.requeue.done">
+				<source>The job has been queued again.</source>
+			</trans-unit>
+			<trans-unit id="module.cancel.done">
+				<source>The job has been cancelled.</source>
+			</trans-unit>
+			<trans-unit id="module.delete.done">
+				<source>The job has been deleted.</source>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>

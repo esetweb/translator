@@ -1,0 +1,202 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
+	  xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
+	  data-namespace-typo3-fluid="true">
+
+<f:layout name="Module" />
+
+<f:section name="Content">
+
+	<div style="margin-bottom: 1em;">
+		<f:link.action action="index" class="btn btn-default btn-sm">
+			<core:icon identifier="actions-view-go-back" /> Back to job list
+		</f:link.action>
+	</div>
+
+	<h1>
+		{job.title}
+		<small class="text-muted">{job.jobIdentifier}</small>
+	</h1>
+
+	<div class="row">
+		<div class="col-md-6">
+			<div class="panel panel-default">
+				<div class="panel-heading">Overview</div>
+				<table class="table">
+					<tbody>
+						<tr>
+							<th style="width: 40%;">Status</th>
+							<td><f:render partial="Job/StatusBadge" arguments="{status: job.status}" /></td>
+						</tr>
+						<tr>
+							<th>Mode</th>
+							<td>
+								<f:if condition="{job.automated}">
+									<f:then>Automated <span class="text-muted">({job.provider})</span></f:then>
+									<f:else>Manual export / import</f:else>
+								</f:if>
+							</td>
+						</tr>
+						<tr>
+							<th>Page</th>
+							<td>[{job.pageUid}]<f:if condition="{job.depth}"> + {job.depth} sub level(s)</f:if></td>
+						</tr>
+						<tr>
+							<th>Source</th>
+							<td>
+								<f:if condition="{source}">
+									<f:then>{source.siteTitle} &ndash; {source.title} <span class="text-muted">({source.translationCode}, id {source.languageId})</span></f:then>
+									<f:else><span class="text-muted">{job.sourceSite}:{job.sourceLanguageId} (site no longer configured)</span></f:else>
+								</f:if>
+							</td>
+						</tr>
+						<tr>
+							<th>Target</th>
+							<td>
+								<f:if condition="{target}">
+									<f:then><strong>{target.siteTitle} &ndash; {target.title}</strong> <span class="text-muted">({target.translationCode}, id {target.languageId})</span></f:then>
+									<f:else><span class="text-muted">{job.targetSite}:{job.targetLanguageId} (site no longer configured)</span></f:else>
+								</f:if>
+							</td>
+						</tr>
+						<tr>
+							<th>Format</th>
+							<td>
+								<f:if condition="{formats.{job.format}}">
+									<f:then>{formats.{job.format}}</f:then>
+									<f:else>{job.format}</f:else>
+								</f:if>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+
+		<div class="col-md-6">
+			<div class="panel panel-default">
+				<div class="panel-heading">Progress</div>
+				<div class="panel-body">
+					<f:render partial="Job/ProgressBar" arguments="{job: job}" />
+					<table class="table" style="margin-top: 1em; margin-bottom: 0;">
+						<tbody>
+							<tr><th style="width: 40%;">Translatable fields</th><td>{job.unitCount}</td></tr>
+							<tr><th>Translated</th><td>{job.translatedCount}</td></tr>
+							<tr><th>Imported</th><td>{job.importedCount}</td></tr>
+							<tr>
+								<th>Started</th>
+								<td><f:if condition="{job.startedAt}"><f:then><f:format.date format="Y-m-d H:i">{job.startedAt}</f:format.date></f:then><f:else>&ndash;</f:else></f:if></td>
+							</tr>
+							<tr>
+								<th>Finished</th>
+								<td><f:if condition="{job.finishedAt}"><f:then><f:format.date format="Y-m-d H:i">{job.finishedAt}</f:format.date></f:then><f:else>&ndash;</f:else></f:if></td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<f:if condition="{job.errorMessage}">
+		<div class="alert alert-danger">
+			<strong>Error:</strong> {job.errorMessage}
+		</div>
+	</f:if>
+
+	<div class="panel panel-default">
+		<div class="panel-heading">Actions</div>
+		<div class="panel-body">
+			<div class="btn-toolbar">
+
+				<div class="btn-group" style="margin-bottom: .5em;">
+					<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+						<core:icon identifier="actions-download" /> Download translation file <span class="caret"></span>
+					</button>
+					<ul class="dropdown-menu">
+						<f:for each="{formats}" as="formatLabel" key="formatId">
+							<li>
+								<f:link.action action="download" arguments="{job: job, format: formatId}">{formatLabel}</f:link.action>
+							</li>
+						</f:for>
+					</ul>
+				</div>
+
+				<f:if condition="{job.automated} && {job.processable}">
+					<f:link.action action="run" arguments="{job: job}" class="btn btn-primary" style="margin-bottom: .5em;">
+						<core:icon identifier="actions-play" /> Send to provider now
+					</f:link.action>
+				</f:if>
+
+				<f:if condition="{job.status} == 'failed'">
+					<f:link.action action="requeue" arguments="{job: job}" class="btn btn-default" style="margin-bottom: .5em;">
+						<core:icon identifier="actions-refresh" /> Queue again
+					</f:link.action>
+				</f:if>
+
+				<f:if condition="{job.finished}">
+					<f:else>
+						<f:link.action action="cancel" arguments="{job: job}" class="btn btn-default" style="margin-bottom: .5em;">
+							<core:icon identifier="actions-close" /> Cancel job
+						</f:link.action>
+					</f:else>
+				</f:if>
+
+				<f:link.action action="delete" arguments="{job: job}" class="btn btn-danger" style="margin-bottom: .5em;"
+					additionalAttributes="{onclick: 'return confirm(\'Delete this job permanently?\');'}">
+					<core:icon identifier="actions-delete" /> Delete
+				</f:link.action>
+			</div>
+
+			<hr />
+
+			<f:form action="upload" arguments="{job: job}" enctype="multipart/form-data" additionalAttributes="{class: 'form-inline'}">
+				<div class="form-group">
+					<label>Import translated file&nbsp;</label>
+					<f:form.upload name="file" additionalAttributes="{accept: '.xlf,.xliff,.xml'}" />
+				</div>
+				<f:form.button class="btn btn-warning">
+					<core:icon identifier="actions-upload" /> Import
+				</f:form.button>
+				<p class="help-block">Upload the file you received back from the translation agency (XLIFF or CATXML).</p>
+			</f:form>
+		</div>
+	</div>
+
+	<div class="panel panel-default">
+		<div class="panel-heading">Translation units ({job.items -> f:count()})</div>
+		<div class="table-fit">
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Field</th>
+						<th>Source</th>
+						<th>Target</th>
+						<th>Status</th>
+					</tr>
+				</thead>
+				<tbody>
+					<f:for each="{job.items}" as="item">
+						<tr>
+							<td>
+								<code>{item.tableName}:{item.recordUid}</code><br />
+								<small class="text-muted">{item.fieldName}</small>
+								<f:if condition="{item.html}"> <span class="label label-default">HTML</span></f:if>
+							</td>
+							<td><div style="max-height: 8em; overflow: auto;">{item.sourceText}</div></td>
+							<td><div style="max-height: 8em; overflow: auto;">{item.targetText}</div></td>
+							<td>
+								<f:render partial="Job/StatusBadge" arguments="{status: item.status}" />
+								<f:if condition="{item.errorMessage}">
+									<div><small class="text-danger">{item.errorMessage}</small></div>
+								</f:if>
+							</td>
+						</tr>
+					</f:for>
+				</tbody>
+			</table>
+		</div>
+	</div>
+
+</f:section>
+
+</html>

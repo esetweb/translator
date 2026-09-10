@@ -1,0 +1,7 @@
+/**
+ * Default page TSconfig of EXT:eset_translator.
+ *
+ * Remove the "eset" entry from disableItems to hide the submenu for a subtree:
+ *   options.contextMenu.table.pages.disableItems = eset
+ */
+options.contextMenu.table.pages.disableItems =

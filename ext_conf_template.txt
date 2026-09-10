@@ -1,0 +1,56 @@
+# cat=providers/deepl/010; type=string; label=DeepL API key: Free keys end with ":fx" and automatically use the free endpoint.
+deeplApiKey =
+
+# cat=providers/deepl/020; type=string; label=DeepL API endpoint: Leave empty for automatic detection (api.deepl.com / api-free.deepl.com).
+deeplApiUrl =
+
+# cat=providers/deepl/030; type=string; label=DeepL glossary id: Optional glossary used for every request.
+deeplGlossaryId =
+
+# cat=providers/google/010; type=string; label=Google Cloud Translation API key
+googleApiKey =
+
+# cat=providers/libretranslate/010; type=string; label=LibreTranslate URL: e.g. http://libretranslate:5000 - free and self hostable.
+libreTranslateUrl =
+
+# cat=providers/libretranslate/020; type=string; label=LibreTranslate API key: Optional, depends on the instance.
+libreTranslateApiKey =
+
+# cat=providers/mymemory/010; type=boolean; label=Enable MyMemory: Free, rate limited API without credentials. Intended for testing only.
+enableMyMemory = 0
+
+# cat=providers/mymemory/020; type=string; label=MyMemory contact e-mail: Raises the free rate limit.
+myMemoryEmail =
+
+# cat=providers/echo/010; type=boolean; label=Enable echo provider: Development only. Prefixes the source text instead of translating.
+enableEchoProvider = 0
+
+# cat=basic/general/010; type=string; label=Default provider: Identifier of the preferred provider (deepl, google, libretranslate, mymemory, echo).
+defaultProvider = deepl
+
+# cat=basic/general/020; type=options[XLIFF 1.2=xliff,CATXML (l10nmgr)=catxml]; label=Default exchange format
+defaultFormat = xliff
+
+# cat=basic/general/030; type=boolean; label=Allow manual fallback: Offer the file download when no provider is configured.
+allowManualFallback = 1
+
+# cat=basic/general/040; type=int+; label=Maximum page tree depth for one job
+maxDepth = 10
+
+# cat=basic/general/050; type=int+; label=Batch size: Number of strings sent to a provider per request.
+chunkSize = 40
+
+# cat=basic/general/060; type=int+; label=Provider timeout in seconds
+providerTimeout = 30
+
+# cat=basic/general/070; type=string; label=Storage folder: Relative to the public web folder, holds generated translation files.
+storageFolder = typo3temp/var/eset_translator
+
+# cat=basic/general/080; type=string; label=Default source language: The language a page is assumed to be written in when it cannot be derived from the copy origin (t3_origuid). A target key like "us:0" or a bare code like "en". Empty = use the page's own site language.
+defaultSourceLanguage = us:0
+
+# cat=basic/records/010; type=string; label=Translatable tables: Comma separated list of tables scanned for translatable fields.
+translatableTables = pages,tt_content
+
+# cat=basic/records/020; type=string; label=Excluded fields: Comma separated "table.field" entries never exported.
+excludedFields = pages.slug,pages.alias,pages.url,tt_content.pi_flexform

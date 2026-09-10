@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.0">
+	<file source-language="en" datatype="plaintext" original="messages" date="2026-01-01T00:00:00Z" product-name="eset_translator">
+		<header/>
+		<body>
+			<trans-unit id="eset_translator.title">
+				<source>ESET Translator</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.requestTranslation">
+				<source>Request translation</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.exchange">
+				<source>Export / import translation</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.source">
+				<source>Source language (what the page is written in now)</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.sourceHelp">
+				<source>Pick the language the page currently contains. For a page copied from the English site this is English, even if the page now lives in another site.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.sameLanguage">
+				<source>Source and target are the same language. Pick the language this page is actually written in (for a page copied from the English site, that is English).</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.target">
+				<source>Target (site and language to write into)</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.depth">
+				<source>Include subpages (levels)</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.onlyUntranslated">
+				<source>Only fields that are not translated yet</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.provider">
+				<source>Translation provider</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.format">
+				<source>File format</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.importFile">
+				<source>Translated file</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.importHelp">
+				<source>Upload the file you received back from the translation agency (XLIFF or CATXML).</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.startTranslation">
+				<source>Translate now</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.download">
+				<source>Download file</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.import">
+				<source>Import file</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.cancel">
+				<source>Cancel</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noProvider">
+				<source>Automated translation is not configured on this installation. Contact your administrator to enable it. You can still export the file for manual translation and import it back.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noTargets">
+				<source>You have no permission for any target language of this site.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noFile">
+				<source>Please choose a translation file first.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.requestFailed">
+				<source>The request failed. Please check the TYPO3 log.</source>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>

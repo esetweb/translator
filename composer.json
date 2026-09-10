@@ -1,0 +1,40 @@
+{
+    "name": "eset/eset-translator",
+    "type": "typo3-cms-extension",
+    "description": "Site aware translation management for TYPO3: export/import translation files and request automated translations from configurable translation providers.",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "ESET",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^7.4 || ^8.0",
+        "ext-dom": "*",
+        "ext-json": "*",
+        "ext-libxml": "*",
+        "typo3/cms-backend": "^10.4",
+        "typo3/cms-core": "^10.4",
+        "typo3/cms-extbase": "^10.4",
+        "typo3/cms-fluid": "^10.4"
+    },
+    "suggest": {
+        "typo3/cms-scheduler": "Allows processing translation jobs in the background."
+    },
+    "autoload": {
+        "psr-4": {
+            "ESET\\Translator\\": "Classes/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ESET\\Translator\\Tests\\": "Tests/"
+        }
+    },
+    "extra": {
+        "typo3/cms": {
+            "extension-key": "eset_translator"
+        }
+    }
+}

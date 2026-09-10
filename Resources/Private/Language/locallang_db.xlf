@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xliff version="1.0">
+	<file source-language="en" datatype="plaintext" original="messages" date="2026-01-01T00:00:00Z" product-name="eset_translator">
+		<header/>
+		<body>
+			<trans-unit id="tx_esettranslator_domain_model_job">
+				<source>Translation job</source>
+			</trans-unit>
+			<trans-unit id="job.job_identifier">
+				<source>Job identifier</source>
+			</trans-unit>
+			<trans-unit id="job.title">
+				<source>Title</source>
+			</trans-unit>
+			<trans-unit id="job.page_uid">
+				<source>Page</source>
+			</trans-unit>
+			<trans-unit id="job.depth">
+				<source>Sub level depth</source>
+			</trans-unit>
+			<trans-unit id="job.source_site">
+				<source>Source site</source>
+			</trans-unit>
+			<trans-unit id="job.source_language_id">
+				<source>Source language id</source>
+			</trans-unit>
+			<trans-unit id="job.target_site">
+				<source>Target site</source>
+			</trans-unit>
+			<trans-unit id="job.target_language_id">
+				<source>Target language id</source>
+			</trans-unit>
+			<trans-unit id="job.mode">
+				<source>Mode</source>
+			</trans-unit>
+			<trans-unit id="job.mode.manual">
+				<source>Manual export / import</source>
+			</trans-unit>
+			<trans-unit id="job.mode.automated">
+				<source>Automated (translation provider)</source>
+			</trans-unit>
+			<trans-unit id="job.provider">
+				<source>Translation provider</source>
+			</trans-unit>
+			<trans-unit id="job.format">
+				<source>Exchange format</source>
+			</trans-unit>
+			<trans-unit id="job.status">
+				<source>Status</source>
+			</trans-unit>
+			<trans-unit id="job.status.new">
+				<source>New</source>
+			</trans-unit>
+			<trans-unit id="job.status.exported">
+				<source>Exported</source>
+			</trans-unit>
+			<trans-unit id="job.status.queued">
+				<source>Queued</source>
+			</trans-unit>
+			<trans-unit id="job.status.running">
+				<source>Running</source>
+			</trans-unit>
+			<trans-unit id="job.status.translated">
+				<source>Translated</source>
+			</trans-unit>
+			<trans-unit id="job.status.imported">
+				<source>Imported</source>
+			</trans-unit>
+			<trans-unit id="job.status.failed">
+				<source>Failed</source>
+			</trans-unit>
+			<trans-unit id="job.status.cancelled">
+				<source>Cancelled</source>
+			</trans-unit>
+			<trans-unit id="job.unit_count">
+				<source>Translatable fields</source>
+			</trans-unit>
+			<trans-unit id="job.translated_count">
+				<source>Translated fields</source>
+			</trans-unit>
+			<trans-unit id="job.imported_count">
+				<source>Imported fields</source>
+			</trans-unit>
+			<trans-unit id="job.error_message">
+				<source>Error message</source>
+			</trans-unit>
+			<trans-unit id="job.export_file">
+				<source>Exported file</source>
+			</trans-unit>
+			<trans-unit id="job.import_file">
+				<source>Imported file</source>
+			</trans-unit>
+			<trans-unit id="job.backend_user_id">
+				<source>Requested by</source>
+			</trans-unit>
+			<trans-unit id="job.started_at">
+				<source>Started at</source>
+			</trans-unit>
+			<trans-unit id="job.finished_at">
+				<source>Finished at</source>
+			</trans-unit>
+			<trans-unit id="job.items">
+				<source>Translation units</source>
+			</trans-unit>
+			<trans-unit id="job.tab.languages">
+				<source>Languages</source>
+			</trans-unit>
+			<trans-unit id="job.tab.processing">
+				<source>Processing</source>
+			</trans-unit>
+			<trans-unit id="job.tab.files">
+				<source>Files</source>
+			</trans-unit>
+			<trans-unit id="job.tab.items">
+				<source>Translation units</source>
+			</trans-unit>
+
+			<trans-unit id="tx_esettranslator_domain_model_jobitem">
+				<source>Translation unit</source>
+			</trans-unit>
+			<trans-unit id="jobitem.job">
+				<source>Job</source>
+			</trans-unit>
+			<trans-unit id="jobitem.table_name">
+				<source>Table</source>
+			</trans-unit>
+			<trans-unit id="jobitem.record_uid">
+				<source>Record uid</source>
+			</trans-unit>
+			<trans-unit id="jobitem.field_name">
+				<source>Field</source>
+			</trans-unit>
+			<trans-unit id="jobitem.record_page_uid">
+				<source>Page uid</source>
+			</trans-unit>
+			<trans-unit id="jobitem.target_uid">
+				<source>Localized record uid</source>
+			</trans-unit>
+			<trans-unit id="jobitem.source_text">
+				<source>Source text</source>
+			</trans-unit>
+			<trans-unit id="jobitem.target_text">
+				<source>Target text</source>
+			</trans-unit>
+			<trans-unit id="jobitem.source_hash">
+				<source>Source hash</source>
+			</trans-unit>
+			<trans-unit id="jobitem.html">
+				<source>Contains HTML</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status">
+				<source>Status</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status.pending">
+				<source>Pending</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status.translated">
+				<source>Translated</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status.imported">
+				<source>Imported</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status.skipped">
+				<source>Skipped</source>
+			</trans-unit>
+			<trans-unit id="jobitem.status.failed">
+				<source>Failed</source>
+			</trans-unit>
+			<trans-unit id="jobitem.error_message">
+				<source>Error message</source>
+			</trans-unit>
+		</body>
+	</file>
+</xliff>

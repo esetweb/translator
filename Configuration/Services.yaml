@@ -1,0 +1,73 @@
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+    public: false
+
+  ESET\Translator\:
+    resource: '../Classes/*'
+    exclude: '../Classes/Domain/{Model,Dto}/*'
+
+  # --- exchange formats -------------------------------------------------
+  ESET\Translator\Format\XliffFormat:
+    tags: ['eset_translator.translation_format']
+
+  ESET\Translator\Format\CatXmlFormat:
+    tags: ['eset_translator.translation_format']
+
+  ESET\Translator\Format\FormatRegistry:
+    public: true
+    arguments:
+      $formats: !tagged_iterator eset_translator.translation_format
+
+  # --- translation providers -------------------------------------------
+  ESET\Translator\Provider\DeeplProvider:
+    tags: ['eset_translator.translation_provider']
+
+  ESET\Translator\Provider\GoogleTranslateProvider:
+    tags: ['eset_translator.translation_provider']
+
+  ESET\Translator\Provider\LibreTranslateProvider:
+    tags: ['eset_translator.translation_provider']
+
+  ESET\Translator\Provider\MyMemoryProvider:
+    tags: ['eset_translator.translation_provider']
+
+  ESET\Translator\Provider\EchoProvider:
+    tags: ['eset_translator.translation_provider']
+
+  ESET\Translator\Provider\ProviderRegistry:
+    public: true
+    arguments:
+      $providers: !tagged_iterator eset_translator.translation_provider
+
+  # --- services needed from non DI aware places (context menu) ----------
+  ESET\Translator\Service\PermissionService:
+    public: true
+
+  ESET\Translator\Service\SiteLanguageService:
+    public: true
+
+  ESET\Translator\Service\ConfigurationService:
+    public: true
+
+  # --- entry points -----------------------------------------------------
+  ESET\Translator\Controller\TranslationWizardController:
+    public: true
+
+  ESET\Translator\Controller\JobController:
+    public: true
+
+  # v10.4: hooked via ButtonBar::getButtonsHook in ext_localconf.php (no
+  # ModifyButtonBarEvent before v11). public so makeInstance() injects its deps.
+  ESET\Translator\EventListener\PageModuleButtonListener:
+    public: true
+
+  # DI managed console command. A command with constructor dependencies must be
+  # registered this way, not via Configuration/Commands.php (which instantiates
+  # it with makeInstance($class, $commandName) and breaks the constructor).
+  ESET\Translator\Command\ProcessJobsCommand:
+    tags:
+      - name: 'console.command'
+        command: 'esettranslator:process'
+        schedulable: true

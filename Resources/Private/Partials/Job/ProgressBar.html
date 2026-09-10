@@ -1,0 +1,12 @@
+<html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers" data-namespace-typo3-fluid="true">
+<f:spaceless>
+	<f:variable name="progress" value="{job.progress}" />
+	<f:variable name="barClass"><f:switch expression="{job.status}"><f:case value="failed">bg-danger</f:case><f:case value="cancelled">bg-warning</f:case><f:case value="imported">bg-success</f:case><f:defaultCase>bg-info</f:defaultCase></f:switch></f:variable>
+	<div class="progress" style="margin-bottom: 0; min-width: 120px;" title="{job.translatedCount} / {job.unitCount}">
+		<div class="progress-bar {barClass}" role="progressbar"
+			 style="width: {progress}%;" aria-valuenow="{progress}" aria-valuemin="0" aria-valuemax="100">
+			{progress}%
+		</div>
+	</div>
+</f:spaceless>
+</html>
