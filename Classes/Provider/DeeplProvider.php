@@ -79,9 +79,14 @@ class DeeplProvider extends AbstractTranslationProvider
         $formData = [
             'source_lang' => strtoupper($this->normalizeLanguageCode($source)),
             'target_lang' => $this->resolveTargetCode($target),
-            'tag_handling' => !empty($options['html']) ? 'html' : 'xml',
             'preserve_formatting' => '1',
         ];
+        // Only enable tag handling for real markup. "xml" tag handling makes
+        // DeepL parse plain text as XML and choke on a bare "&" or "&nbsp;"
+        // ("Tag handling parsing failed … undefined entity").
+        if (!empty($options['html'])) {
+            $formData['tag_handling'] = 'html';
+        }
         $glossaryId = $this->configuration->get('deeplGlossaryId');
         if ($glossaryId !== '') {
             $formData['glossary_id'] = $glossaryId;
