@@ -41,12 +41,16 @@ class RecordCollectorService
         $this->siteLanguageService = $siteLanguageService;
     }
 
+    /**
+     * @param string[] $skipCTypes tt_content CType values to leave out of this job
+     */
     public function collect(
         int $pageUid,
         TranslationTarget $source,
         TranslationTarget $target,
         int $depth = 0,
-        bool $onlyUntranslated = true
+        bool $onlyUntranslated = true,
+        array $skipCTypes = []
     ): TranslationDataSet {
         $dataSet = new TranslationDataSet($source, $target, $pageUid);
         $pageUids = $this->resolvePageUids($pageUid, $source, $depth);
@@ -55,7 +59,7 @@ class RecordCollectorService
             if (!isset($GLOBALS['TCA'][$table])) {
                 continue;
             }
-            foreach ($this->fetchRecords($table, $pageUids, $source) as $record) {
+            foreach ($this->fetchRecords($table, $pageUids, $source, $skipCTypes) as $record) {
                 $this->addRecordToDataSet($dataSet, $table, $record, $target, $onlyUntranslated);
             }
         }
@@ -123,9 +127,10 @@ class RecordCollectorService
 
     /**
      * @param int[] $pageUids
+     * @param string[] $skipCTypes
      * @return array<int, array<string, mixed>>
      */
-    protected function fetchRecords(string $table, array $pageUids, TranslationTarget $source): array
+    protected function fetchRecords(string $table, array $pageUids, TranslationTarget $source, array $skipCTypes = []): array
     {
         if ($pageUids === []) {
             return [];
@@ -154,12 +159,100 @@ class RecordCollectorService
             );
         }
 
+        $skipCTypes = array_values(array_filter($skipCTypes));
+        if ($table === 'tt_content' && $skipCTypes !== [] && isset($GLOBALS['TCA']['tt_content']['columns']['CType'])) {
+            $constraints[] = $queryBuilder->expr()->notIn(
+                'CType',
+                $queryBuilder->createNamedParameter($skipCTypes, \TYPO3\CMS\Core\Database\Connection::PARAM_STR_ARRAY)
+            );
+        }
+
         return $queryBuilder
             ->select('*')
             ->from($table)
             ->where(...$constraints)
             ->execute()
             ->fetchAll();
+    }
+
+    /**
+     * The tt_content content types present in the page subtree, for the wizard's
+     * "skip content types" checkboxes.
+     *
+     * @return array<int, array{cType: string, label: string, count: int, excludedByDefault: bool}>
+     */
+    public function collectContentTypes(int $pageUid, TranslationTarget $source, int $depth): array
+    {
+        if (!isset($GLOBALS['TCA']['tt_content']['columns']['CType'])) {
+            return [];
+        }
+        $pageUids = $this->resolvePageUids($pageUid, $source, $depth);
+        if ($pageUids === []) {
+            return [];
+        }
+
+        $languageField = (string)($GLOBALS['TCA']['tt_content']['ctrl']['languageField'] ?? 'sys_language_uid');
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tt_content');
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+
+        $rows = $queryBuilder
+            ->select('CType')
+            ->addSelectLiteral('COUNT(*) AS cnt')
+            ->from('tt_content')
+            ->where(
+                $queryBuilder->expr()->in(
+                    'pid',
+                    $queryBuilder->createNamedParameter($pageUids, \TYPO3\CMS\Core\Database\Connection::PARAM_INT_ARRAY)
+                ),
+                $queryBuilder->expr()->eq(
+                    $languageField,
+                    $queryBuilder->createNamedParameter($source->getLanguageId(), \PDO::PARAM_INT)
+                )
+            )
+            ->groupBy('CType')
+            ->execute()
+            ->fetchAll();
+
+        $excluded = $this->configuration->getExcludedCTypes();
+        $labels = $this->getCTypeLabels();
+        $types = [];
+        foreach ($rows as $row) {
+            $cType = (string)$row['CType'];
+            $types[] = [
+                'cType' => $cType,
+                'label' => $labels[$cType] ?? $cType,
+                'count' => (int)$row['cnt'],
+                'excludedByDefault' => in_array($cType, $excluded, true),
+            ];
+        }
+        usort($types, static function (array $a, array $b): int {
+            return strcmp($a['label'], $b['label']);
+        });
+
+        return $types;
+    }
+
+    /**
+     * @return array<string, string> CType value => resolved label
+     */
+    protected function getCTypeLabels(): array
+    {
+        $items = (array)($GLOBALS['TCA']['tt_content']['columns']['CType']['config']['items'] ?? []);
+        $languageService = $GLOBALS['LANG'] ?? null;
+        $labels = [];
+        foreach ($items as $item) {
+            $value = (string)($item[1] ?? '');
+            if ($value === '' || $value === '--div--') {
+                continue;
+            }
+            $label = (string)($item[0] ?? $value);
+            if ($languageService instanceof LanguageService && strpos($label, 'LLL:') === 0) {
+                $label = $languageService->sL($label) ?: $value;
+            }
+            $labels[$value] = $label;
+        }
+
+        return $labels;
     }
 
     /**
@@ -184,13 +277,26 @@ class RecordCollectorService
             if (trim($value) === '') {
                 continue;
             }
-            if ($onlyUntranslated
-                && $existingTranslation !== null
-                && trim((string)($existingTranslation[$field] ?? '')) !== ''
-                && (string)($existingTranslation[$field] ?? '') !== $value
-            ) {
-                // already translated and edited by a human, do not overwrite
-                continue;
+            if ($onlyUntranslated) {
+                // Overlay: skip fields whose overlay record already holds a
+                // translation (value differs from the default language).
+                if ($existingTranslation !== null
+                    && trim((string)($existingTranslation[$field] ?? '')) !== ''
+                    && (string)($existingTranslation[$field] ?? '') !== $value
+                ) {
+                    continue;
+                }
+                // In place (languageId 0): no overlay record exists - the field
+                // itself is the translation. Skip when the value already differs
+                // from the record this one was copied from (t3_origuid) - it has
+                // been translated, manually or by a previous job - or when this
+                // extension imported exactly this value before.
+                if ($target->getLanguageId() === 0
+                    && ($this->differsFromCopyOrigin($table, $record, $field)
+                        || $this->wasImportedInPlace($table, $uid, $field, $value))
+                ) {
+                    continue;
+                }
             }
 
             $unit = new TranslationUnit(
@@ -210,6 +316,56 @@ class RecordCollectorService
             }
             $dataSet->addUnit($unit);
         }
+    }
+
+    /**
+     * True when the field value no longer matches the record this one was copied
+     * from (t3_origuid), i.e. it has been translated/edited since the copy.
+     * Returns false when the record is not a copy (origin unknown).
+     *
+     * @param array<string, mixed> $record
+     */
+    protected function differsFromCopyOrigin(string $table, array $record, string $field): bool
+    {
+        $origUidField = (string)($GLOBALS['TCA'][$table]['ctrl']['origUid'] ?? '');
+        if ($origUidField === '') {
+            return false;
+        }
+        $originUid = (int)($record[$origUidField] ?? 0);
+        if ($originUid <= 0 || $originUid === (int)$record['uid']) {
+            return false;
+        }
+        $origin = BackendUtility::getRecord($table, $originUid, $field);
+        if ($origin === null || !array_key_exists($field, $origin)) {
+            return false;
+        }
+
+        return (string)$origin[$field] !== (string)($record[$field] ?? '');
+    }
+
+    /**
+     * True when a completed ESET import already wrote this exact value into the
+     * field - i.e. our previous in-place translation is still there untouched.
+     */
+    protected function wasImportedInPlace(string $table, int $uid, string $field, string $currentValue): bool
+    {
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable('tx_esettranslator_domain_model_jobitem');
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+
+        $count = $queryBuilder
+            ->count('uid')
+            ->from('tx_esettranslator_domain_model_jobitem')
+            ->where(
+                $queryBuilder->expr()->eq('table_name', $queryBuilder->createNamedParameter($table)),
+                $queryBuilder->expr()->eq('record_uid', $queryBuilder->createNamedParameter($uid, \PDO::PARAM_INT)),
+                $queryBuilder->expr()->eq('field_name', $queryBuilder->createNamedParameter($field)),
+                $queryBuilder->expr()->eq('status', $queryBuilder->createNamedParameter(\ESET\Translator\Domain\Model\JobItem::STATUS_IMPORTED)),
+                $queryBuilder->expr()->eq('target_text', $queryBuilder->createNamedParameter($currentValue))
+            )
+            ->execute()
+            ->fetchColumn(0);
+
+        return (int)$count > 0;
     }
 
     /**

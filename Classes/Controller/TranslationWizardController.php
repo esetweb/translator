@@ -13,6 +13,7 @@ use ESET\Translator\Service\ExportService;
 use ESET\Translator\Service\ImportService;
 use ESET\Translator\Service\JobService;
 use ESET\Translator\Service\PermissionService;
+use ESET\Translator\Service\RecordCollectorService;
 use ESET\Translator\Service\SiteLanguageService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -57,6 +58,9 @@ class TranslationWizardController
     /** @var ConfigurationService */
     protected $configuration;
 
+    /** @var RecordCollectorService */
+    protected $recordCollector;
+
     public function __construct(
         SiteLanguageService $siteLanguageService,
         PermissionService $permissionService,
@@ -66,7 +70,8 @@ class TranslationWizardController
         ExportService $exportService,
         ImportService $importService,
         JobRepository $jobRepository,
-        ConfigurationService $configuration
+        ConfigurationService $configuration,
+        RecordCollectorService $recordCollector
     ) {
         $this->siteLanguageService = $siteLanguageService;
         $this->permissionService = $permissionService;
@@ -77,6 +82,7 @@ class TranslationWizardController
         $this->importService = $importService;
         $this->jobRepository = $jobRepository;
         $this->configuration = $configuration;
+        $this->recordCollector = $recordCollector;
     }
 
     /**
@@ -149,6 +155,13 @@ class TranslationWizardController
             'source' => $source,
             'sources' => array_values($allowedSources),
             'targets' => array_values($allowedTargets),
+            // tt_content types present in the page (at max configured depth so
+            // the list is complete whatever depth the editor picks).
+            'contentTypes' => $this->recordCollector->collectContentTypes(
+                $pageUid,
+                $source,
+                $this->configuration->getMaxDepth()
+            ),
             'providersPerTarget' => $providers,
             'providers' => array_map(
                 static function ($provider): array {
@@ -311,12 +324,18 @@ class TranslationWizardController
             $mode = Job::MODE_MANUAL;
         }
 
+        $skipCTypes = $params['skipCTypes'] ?? '';
+        if (is_string($skipCTypes)) {
+            $skipCTypes = GeneralUtility::trimExplode(',', $skipCTypes, true);
+        }
+
         return $this->jobService->createJob($pageUid, $sourceKey, $targetKey, [
             'mode' => $mode,
             'provider' => (string)($params['provider'] ?? ''),
             'format' => (string)($params['format'] ?? ''),
             'depth' => (int)($params['depth'] ?? 0),
             'onlyUntranslated' => (bool)($params['onlyUntranslated'] ?? true),
+            'skipCTypes' => (array)$skipCTypes,
         ]);
     }
 

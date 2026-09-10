@@ -116,6 +116,23 @@ define([
       + '</label></div>'
     );
 
+    if (options.contentTypes && options.contentTypes.length) {
+      var ctypeRows = options.contentTypes.map(function (ct) {
+        return '<div class="checkbox"><label>'
+          + '<input type="checkbox" class="eset-translator-ctype" value="' + TranslationWizard.escape(ct.cType) + '"'
+          + (ct.excludedByDefault ? '' : ' checked') + '> '
+          + TranslationWizard.escape(ct.label)
+          + ' <span class="text-muted">(' + ct.count + ')</span>'
+          + '</label></div>';
+      }).join('');
+      $form.append(
+        '<div class="form-group">'
+        + '<label class="form-label">' + TranslationWizard.lang('eset_translator.contentTypes', 'Content types to translate') + '</label>'
+        + ctypeRows
+        + '</div>'
+      );
+    }
+
     if (automated) {
       var providerOptions = options.providers.map(function (provider) {
         return '<option value="' + TranslationWizard.escape(provider.id) + '">'
@@ -185,6 +202,14 @@ define([
     if (!data.onlyUntranslated) {
       data.onlyUntranslated = '0';
     }
+
+    var skip = [];
+    $modal.find('.eset-translator-ctype').each(function () {
+      if (!this.checked) {
+        skip.push(this.value);
+      }
+    });
+    data.skipCTypes = skip.join(',');
 
     return data;
   };

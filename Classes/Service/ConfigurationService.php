@@ -95,6 +95,17 @@ class ConfigurationService
             || in_array('*.' . $field, $excluded, true);
     }
 
+    /**
+     * tt_content CType values skipped by default. The wizard pre-unchecks these
+     * but the editor can re-include them per request.
+     *
+     * @return string[]
+     */
+    public function getExcludedCTypes(): array
+    {
+        return $this->getList('excludedCTypes', ['html']);
+    }
+
     public function getDefaultProvider(): string
     {
         return $this->get('defaultProvider', 'deepl');

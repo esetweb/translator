@@ -63,6 +63,18 @@ For a copied page the source language is guessed automatically from
 `defaultSourceLanguage` → the page's own site language. The editor can always
 override it in the modal.
 
+**"Only fields that are not translated yet"** (wizard checkbox):
+
+- *Overlay target* — skips fields whose overlay record already holds a value
+  different from the default language.
+- *In‑place target* (`languageId 0`) — there is no overlay record, so a field
+  counts as translated when its value already **differs from the record it was
+  copied from** (`t3_origuid`), or when a previous ESET import wrote exactly that
+  value. Re‑running a job then only picks up new / reverted content.
+
+Counts in the Translation jobs module are **per field**, not per content element
+(a typical CE has 2–3 translatable fields).
+
 ---
 
 ## 3. Installation
@@ -148,6 +160,7 @@ Install Tool → **Settings → Extension Configuration → eset_translator**:
 | `storageFolder` | `typo3temp/var/eset_translator` | where generated files are kept |
 | `translatableTables` | `pages,tt_content` | tables scanned for translatable fields |
 | `excludedFields` | `pages.slug,pages.alias,pages.url,tt_content.pi_flexform` | `table.field` (or `*.field`) never exported |
+| `excludedCTypes` | `html` | `tt_content` CType values skipped by default (e.g. raw HTML embeds). Pre‑unchecked in the wizard's "content types" list; the editor can re‑include them per request. |
 
 A field is treated as translatable when it is TCA type `input`/`text`, not
 `readOnly`, not `l10n_mode = exclude`, not `allowLanguageSynchronization`, and

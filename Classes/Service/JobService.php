@@ -63,7 +63,7 @@ class JobService
     }
 
     /**
-     * @param array{mode?: string, provider?: string, format?: string, depth?: int, title?: string, onlyUntranslated?: bool} $options
+     * @param array{mode?: string, provider?: string, format?: string, depth?: int, title?: string, onlyUntranslated?: bool, skipCTypes?: string[]} $options
      */
     public function createJob(int $pageUid, string $sourceKey, string $targetKey, array $options = []): Job
     {
@@ -76,8 +76,9 @@ class JobService
             : Job::MODE_MANUAL;
         $depth = max(0, (int)($options['depth'] ?? 0));
         $onlyUntranslated = (bool)($options['onlyUntranslated'] ?? true);
+        $skipCTypes = array_values(array_filter((array)($options['skipCTypes'] ?? [])));
 
-        $dataSet = $this->recordCollector->collect($pageUid, $source, $target, $depth, $onlyUntranslated);
+        $dataSet = $this->recordCollector->collect($pageUid, $source, $target, $depth, $onlyUntranslated, $skipCTypes);
         if (count($dataSet) === 0) {
             throw new \RuntimeException(
                 'Nothing to translate: no translatable content was found for the selected page and language.',

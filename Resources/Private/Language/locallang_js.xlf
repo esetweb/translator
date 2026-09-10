@@ -30,6 +30,9 @@
 			<trans-unit id="eset_translator.onlyUntranslated">
 				<source>Only fields that are not translated yet</source>
 			</trans-unit>
+			<trans-unit id="eset_translator.contentTypes">
+				<source>Content types to translate (uncheck to skip)</source>
+			</trans-unit>
 			<trans-unit id="eset_translator.provider">
 				<source>Translation provider</source>
 			</trans-unit>

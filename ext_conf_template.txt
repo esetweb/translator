@@ -54,3 +54,6 @@ translatableTables = pages,tt_content
 
 # cat=basic/records/020; type=string; label=Excluded fields: Comma separated "table.field" entries never exported.
 excludedFields = pages.slug,pages.alias,pages.url,tt_content.pi_flexform
+
+# cat=basic/records/030; type=string; label=Excluded content types: Comma separated tt_content CType values skipped by default (e.g. html). The editor can re-include them per request.
+excludedCTypes = html
