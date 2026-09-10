@@ -184,6 +184,12 @@ Not handled: FlexForm **sections/containers** and language‑split flex
 (`langChildren` / `vDA`). Add `tt_content.pi_flexform` back to `excludedFields`,
 or set `translateFlexForm = 0`, to turn the feature off.
 
+> **Upgrading:** earlier versions shipped `tt_content.pi_flexform` in the default
+> `excludedFields`. If you saved the extension configuration back then, that
+> entry is still in your `excludedFields` value and keeps FlexForm content
+> excluded — remove it in *Settings → Extension Configuration* to pick the
+> feature up.
+
 ---
 
 ## 7. Automated translation — failsafe policy
