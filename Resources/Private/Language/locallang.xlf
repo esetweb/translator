@@ -29,8 +29,7 @@
 			</trans-unit>
 			<trans-unit id="module.run.done">
 				<source>The job has been processed.</source>
-			</trans-unit>
-			<trans-unit id="module.requeue.done">
+			</trans-unit>			<trans-unit id="module.requeue.done">
 				<source>The job has been queued again.</source>
 			</trans-unit>
 			<trans-unit id="module.cancel.done">
@@ -38,6 +37,21 @@
 			</trans-unit>
 			<trans-unit id="module.delete.done">
 				<source>The job has been deleted.</source>
+			</trans-unit>
+			<trans-unit id="permissions.header">
+				<source>ESET Translator</source>
+			</trans-unit>
+			<trans-unit id="permissions.requestTranslation">
+				<source>Request automated translation</source>
+			</trans-unit>
+			<trans-unit id="permissions.requestTranslation.description">
+				<source>Show the "Request translation" button and allow starting a provider job.</source>
+			</trans-unit>
+			<trans-unit id="permissions.exchange">
+				<source>Export / import translation</source>
+			</trans-unit>
+			<trans-unit id="permissions.exchange.description">
+				<source>Show the export/import button and allow the manual exchange wizard.</source>
 			</trans-unit>
 		</body>
 	</file>

@@ -6,6 +6,7 @@ namespace ESET\Translator\Domain\Model;
 
 use ESET\Translator\Domain\Dto\TranslationTarget;
 use TYPO3\CMS\Extbase\DomainObject\AbstractEntity;
+use TYPO3\CMS\Extbase\Annotation\ORM\Cascade;
 use TYPO3\CMS\Extbase\Persistence\ObjectStorage;
 
 /**
@@ -88,7 +89,9 @@ class Job extends AbstractEntity
     /** @var \DateTime|null */
     protected $finishedAt;
 
-    /** @var ObjectStorage<JobItem> */
+    /** @var ObjectStorage<JobItem>
+     * @Cascade("remove")
+     */
     protected $items;
 
     public function __construct()

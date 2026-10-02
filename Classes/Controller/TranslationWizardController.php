@@ -14,6 +14,7 @@ use ESET\Translator\Service\ImportService;
 use ESET\Translator\Service\JobService;
 use ESET\Translator\Service\PermissionService;
 use ESET\Translator\Service\RecordCollectorService;
+use ESET\Translator\Service\ReferenceService;
 use ESET\Translator\Service\SiteLanguageService;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -61,6 +62,9 @@ class TranslationWizardController
     /** @var RecordCollectorService */
     protected $recordCollector;
 
+    /** @var ReferenceService */
+    protected $referenceService;
+
     public function __construct(
         SiteLanguageService $siteLanguageService,
         PermissionService $permissionService,
@@ -71,7 +75,8 @@ class TranslationWizardController
         ImportService $importService,
         JobRepository $jobRepository,
         ConfigurationService $configuration,
-        RecordCollectorService $recordCollector
+        RecordCollectorService $recordCollector,
+        ReferenceService $referenceService
     ) {
         $this->siteLanguageService = $siteLanguageService;
         $this->permissionService = $permissionService;
@@ -83,6 +88,7 @@ class TranslationWizardController
         $this->jobRepository = $jobRepository;
         $this->configuration = $configuration;
         $this->recordCollector = $recordCollector;
+        $this->referenceService = $referenceService;
     }
 
     /**
@@ -176,7 +182,36 @@ class TranslationWizardController
             // is offered instead of an unusable "translate now" button.
             'automatedAvailable' => $this->providerRegistry->hasAnyAvailable(),
             'manualFallback' => $this->configuration->isManualFallbackEnabled(),
+            // Which wizard tabs the editor may use.
+            'canRequest' => $this->permissionService->canRequestTranslation(),
+            'canExchange' => $this->permissionService->canExchangeTranslation(),
         ]);
+    }
+
+    /**
+     * Wizard step 1 -> 2: content types and "Insert records" references for the
+     * chosen source, target and depth.
+     */
+    public function analyzeAction(ServerRequestInterface $request): ResponseInterface
+    {
+        $params = $request->getQueryParams();
+        $pageUid = (int)($params['page'] ?? 0);
+        $depth = max(0, min((int)($params['depth'] ?? 0), $this->configuration->getMaxDepth()));
+
+        try {
+            $source = $this->siteLanguageService->getTarget((string)($params['source'] ?? ''));
+            $target = $this->siteLanguageService->getTarget((string)($params['target'] ?? ''));
+            $this->permissionService->assertTranslationAllowed($pageUid, $source, $target);
+
+            return new JsonResponse([
+                'success' => true,
+                'contentTypes' => $this->recordCollector->collectContentTypes($pageUid, $source, $depth),
+                'references' => $this->referenceService->analyze($pageUid, $source, $target, $depth),
+                'inPlace' => $target->getLanguageId() === 0,
+            ]);
+        } catch (\Throwable $exception) {
+            return $this->error($exception->getMessage());
+        }
     }
 
     /**
@@ -205,6 +240,7 @@ class TranslationWizardController
                 $job->getJobIdentifier(),
                 $job->getUnitCount()
             ),
+            'referenceReport' => $this->jobService->getLastReferenceReport(),
             'downloadUrl' => $job->isAutomated() ? '' : $this->buildDownloadUrl($job),
         ]);
     }
@@ -329,14 +365,28 @@ class TranslationWizardController
             $skipCTypes = GeneralUtility::trimExplode(',', $skipCTypes, true);
         }
 
-        return $this->jobService->createJob($pageUid, $sourceKey, $targetKey, [
+        $options = [
             'mode' => $mode,
             'provider' => (string)($params['provider'] ?? ''),
             'format' => (string)($params['format'] ?? ''),
             'depth' => (int)($params['depth'] ?? 0),
             'onlyUntranslated' => (bool)($params['onlyUntranslated'] ?? true),
             'skipCTypes' => (array)$skipCTypes,
-        ]);
+        ];
+
+        // Reference decisions from wizard step 3, JSON {"<shortcut>:<ref>": action}.
+        // Only sent by the wizard; other callers keep the old behaviour.
+        if (isset($params['references']) && is_string($params['references'])) {
+            $decisions = json_decode($params['references'], true);
+            $options['references'] = [];
+            foreach (is_array($decisions) ? $decisions : [] as $key => $action) {
+                if (is_string($action)) {
+                    $options['references'][(string)$key] = $action;
+                }
+            }
+        }
+
+        return $this->jobService->createJob($pageUid, $sourceKey, $targetKey, $options);
     }
 
     /**

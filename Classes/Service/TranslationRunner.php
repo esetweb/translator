@@ -8,6 +8,8 @@ use ESET\Translator\Domain\Model\Job;
 use ESET\Translator\Domain\Model\JobItem;
 use ESET\Translator\Provider\ProviderRegistry;
 use ESET\Translator\Provider\TranslationProviderException;
+use TYPO3\CMS\Core\Database\Connection;
+use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Log\LogManager;
 use Psr\Log\LoggerInterface;
 
@@ -32,18 +34,23 @@ class TranslationRunner
     /** @var LoggerInterface */
     protected $logger;
 
+    /** @var ConnectionPool */
+    protected $connectionPool;
+
     public function __construct(
         ProviderRegistry $providerRegistry,
         JobService $jobService,
         ImportService $importService,
         SiteLanguageService $siteLanguageService,
-        LogManager $logManager
+        LogManager $logManager,
+        ConnectionPool $connectionPool
     ) {
         $this->providerRegistry = $providerRegistry;
         $this->jobService = $jobService;
         $this->importService = $importService;
         $this->siteLanguageService = $siteLanguageService;
         $this->logger = $logManager->getLogger(__CLASS__);
+        $this->connectionPool = $connectionPool;
     }
 
     /**
@@ -53,6 +60,11 @@ class TranslationRunner
     {
         if (!$job->isAutomated()) {
             throw new \RuntimeException('Only automated jobs can be processed by the runner.', 1710000140);
+        }
+        // Background run (module / wizard) and the scheduler may pick up the
+        // same job - only the one that switches it to "running" proceeds.
+        if (!$this->claim($job)) {
+            return $job;
         }
 
         $job->setStatus(Job::STATUS_RUNNING);
@@ -78,6 +90,28 @@ class TranslationRunner
         }
 
         return $job;
+    }
+
+    /**
+     * Atomically moves a processable job (new / queued) to "running".
+     */
+    protected function claim(Job $job): bool
+    {
+        $connection = $this->connectionPool->getConnectionForTable('tx_esettranslator_domain_model_job');
+        $queryBuilder = $connection->createQueryBuilder();
+        $affected = $queryBuilder
+            ->update('tx_esettranslator_domain_model_job')
+            ->set('status', Job::STATUS_RUNNING)
+            ->where(
+                $queryBuilder->expr()->eq('uid', $queryBuilder->createNamedParameter((int)$job->getUid(), \PDO::PARAM_INT)),
+                $queryBuilder->expr()->in(
+                    'status',
+                    $queryBuilder->createNamedParameter([Job::STATUS_NEW, Job::STATUS_QUEUED], Connection::PARAM_STR_ARRAY)
+                )
+            )
+            ->execute();
+
+        return (int)$affected === 1;
     }
 
     protected function translate(Job $job): void

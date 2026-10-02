@@ -122,9 +122,9 @@
 				</div>
 
 				<f:if condition="{job.automated} && {job.processable}">
-					<f:link.action action="run" arguments="{job: job}" class="btn btn-primary" style="margin-bottom: .5em;">
+					<a href="#" class="btn btn-primary" style="margin-bottom: .5em;" data-eset-run-job="{job.uid}">
 						<core:icon identifier="actions-play" /> Send to provider now
-					</f:link.action>
+					</a>
 				</f:if>
 
 				<f:if condition="{job.status} == 'failed'">
@@ -141,8 +141,8 @@
 					</f:else>
 				</f:if>
 
-				<f:link.action action="delete" arguments="{job: job}" class="btn btn-danger" style="margin-bottom: .5em;"
-					additionalAttributes="{onclick: 'return confirm(\'Delete this job permanently?\');'}">
+				<f:link.action action="delete" arguments="{job: job}" class="btn btn-danger t3js-modal-trigger" style="margin-bottom: .5em;"
+					additionalAttributes="{'data-title': 'Delete job', 'data-content': 'Delete this translation job permanently? Content already written to the pages is not affected.', 'data-severity': 'warning', 'data-button-ok-text': 'Delete', 'data-button-close-text': 'Cancel'}">
 					<core:icon identifier="actions-delete" /> Delete
 				</f:link.action>
 			</div>

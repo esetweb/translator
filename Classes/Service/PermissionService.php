@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ESET\Translator\Service;
 
 use ESET\Translator\Domain\Dto\TranslationTarget;
+use ESET\Translator\Domain\Model\Job;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
@@ -116,6 +117,27 @@ class PermissionService
         $page = BackendUtility::getRecord('pages', $pageUid);
 
         return $page !== null && $backendUser->doesUserHaveAccess($page, Permission::PAGE_SHOW);
+    }
+
+    /**
+     * Jobs module / job AJAX endpoints: admins, the job's creator, and editors
+     * allowed to write the job's target.
+     */
+    public function canAccessJob(Job $job): bool
+    {
+        $backendUser = $this->getBackendUser();
+        if ($backendUser === null) {
+            return false;
+        }
+        if ($backendUser->isAdmin()) {
+            return true;
+        }
+        if ($job->getBackendUserId() === (int)($backendUser->user['uid'] ?? 0)) {
+            return true;
+        }
+        $target = $this->siteLanguageService->findTarget($job->getTargetKey());
+
+        return $target !== null && $this->isTargetAllowed($target);
     }
 
     public function canEditPage(int $pageUid): bool
@@ -318,5 +340,24 @@ class PermissionService
     protected function getBackendUser(): ?BackendUserAuthentication
     {
         return $GLOBALS['BE_USER'] ?? null;
+    }
+
+    public function canRequestTranslation(): bool
+    {
+        return $this->checkCustomOption('requestTranslation');
+    }
+
+    public function canExchangeTranslation(): bool
+    {
+        return $this->checkCustomOption('exchangeTranslation');
+    }
+
+    protected function checkCustomOption(string $itemKey): bool
+    {
+        $backendUser = $GLOBALS['BE_USER'] ?? null;
+        if ($backendUser === null) {
+            return false;
+        }
+        return (bool)$backendUser->check('custom_options', 'tx_esettranslator:' . $itemKey);
     }
 }

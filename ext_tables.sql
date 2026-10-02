@@ -22,9 +22,13 @@ CREATE TABLE tx_esettranslator_domain_model_job (
 	finished_at int(11) unsigned DEFAULT '0' NOT NULL,
 	items int(11) unsigned DEFAULT '0' NOT NULL,
 
-	KEY job_identifier (job_identifier),
-	KEY status_mode (status,mode),
-	KEY page (page_uid)
+    KEY job_identifier (job_identifier),
+    KEY status_mode (status,mode),
+    KEY page (page_uid),
+    KEY status_finished (status,finished_at),
+    KEY beuser (backend_user_id),
+    KEY source_site (source_site),
+    KEY target_site (target_site)
 );
 
 CREATE TABLE tx_esettranslator_domain_model_jobitem (
@@ -41,6 +45,6 @@ CREATE TABLE tx_esettranslator_domain_model_jobitem (
 	status varchar(20) DEFAULT 'pending' NOT NULL,
 	error_message text,
 
-	KEY job (job),
-	KEY record (table_name,record_uid)
+    KEY job (job),
+    KEY record (table_name,record_uid)
 );

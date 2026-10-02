@@ -1,13 +1,45 @@
 <html xmlns:f="http://typo3.org/ns/TYPO3/CMS/Fluid/ViewHelpers"
 	  xmlns:core="http://typo3.org/ns/TYPO3/CMS/Core/ViewHelpers"
 	  data-namespace-typo3-fluid="true">
-
 <f:layout name="Module" />
-
 <f:section name="Content">
-
+	<style>
+		.tx-translator-jobs td,
+		.tx-translator-jobs th {
+			white-space: normal;
+			vertical-align: top;
+		}
+		.tx-translator-jobs .job-main {
+			max-width: 28em;
+			word-break: break-word;
+		}
+		.tx-translator-jobs .job-identifier {
+			display: block;
+			max-width: 22em;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+		}
+		.tx-translator-jobs .job-route {
+			word-break: break-word;
+		}
+		.tx-translator-jobs .col-control {
+			white-space: nowrap;
+			width: 1%;
+		}
+		.tx-translator-jobs .job-error-row td {
+			white-space: normal;
+			word-break: break-word;
+		}
+		.tx-translator-jobs .job-error-details summary {
+			cursor: pointer;
+		}
+		.tx-translator-jobs .job-error-details .job-error-body {
+			display: block;
+			margin-top: .35em;
+		}
+	</style>
 	<h1>Translation jobs</h1>
-
 	<f:if condition="{providersAvailable}">
 		<f:else>
 			<div class="alert alert-info">
@@ -17,7 +49,6 @@
 			</div>
 		</f:else>
 	</f:if>
-
 	<div class="row" style="margin-bottom: 1em;">
 		<f:for each="{statuses}" as="status">
 			<div class="col-sm-3 col-md-2" style="margin-bottom: .5em;">
@@ -33,7 +64,6 @@
 			</div>
 		</f:for>
 	</div>
-
 	<div class="panel panel-default">
 		<div class="panel-body">
 			<form action="{f:uri.action(action: 'index')}" method="get" class="form-inline">
@@ -60,90 +90,133 @@
 			</form>
 		</div>
 	</div>
-
 	<f:if condition="{jobs}">
 		<f:then>
 			<div class="table-fit">
-				<table class="table table-striped table-hover">
+				<table class="table table-striped table-hover tx-translator-jobs">
 					<thead>
-						<tr>
-							<th>Job</th>
-							<th>Page</th>
-							<th>Source &rarr; Target</th>
-							<th>Mode</th>
-							<th>Status</th>
-							<th>Progress</th>
-							<th class="col-control"></th>
-						</tr>
+					<tr>
+						<th>Job</th>
+						<th>Page</th>
+						<th>Source &rarr; Target</th>
+						<th>Mode</th>
+						<th>Status</th>
+						<th>Progress</th>
+						<th class="col-control"></th>
+					</tr>
 					</thead>
 					<tbody>
-						<f:for each="{jobs}" as="job">
-							<tr>
-								<td>
-									<f:link.action action="show" arguments="{job: job}"><strong>{job.title}</strong></f:link.action>
-									<div><small class="text-muted">{job.jobIdentifier}</small></div>
-								</td>
-								<td>[{job.pageUid}]</td>
-								<td>
-									<span class="text-muted">{job.sourceSite}:{job.sourceLanguageId}</span>
-									&rarr;
-									<strong>{job.targetSite}:{job.targetLanguageId}</strong>
-								</td>
-								<td>
-									<f:if condition="{job.automated}">
-										<f:then><span class="label label-info" title="{job.provider}">automated</span></f:then>
-										<f:else><span class="label label-default">manual</span></f:else>
+					<f:for each="{jobs}" as="job">
+						<tr>
+							<td class="job-main">
+								<f:link.action action="show" arguments="{job: job}"><strong>{job.title}</strong></f:link.action>
+								<div>
+									<small class="text-muted job-identifier" title="{job.jobIdentifier}">{job.jobIdentifier}</small>
+								</div>
+							</td>
+							<td>[{job.pageUid}]</td>
+							<td class="job-route">
+								<span class="text-muted">{job.sourceSite}:{job.sourceLanguageId}</span>
+								&rarr;
+								<strong>{job.targetSite}:{job.targetLanguageId}</strong>
+							</td>
+							<td>
+								<f:if condition="{job.automated}">
+									<f:then><span class="label label-info" title="{job.provider}">automated</span></f:then>
+									<f:else><span class="label label-default">manual</span></f:else>
+								</f:if>
+							</td>
+							<td><f:render partial="Job/StatusBadge" arguments="{status: job.status}" /></td>
+							<td><f:render partial="Job/ProgressBar" arguments="{job: job}" /></td>
+							<td class="col-control">
+								<div class="btn-group btn-group-sm">
+									<f:link.action action="show" arguments="{job: job}" class="btn btn-default" title="Details">
+										<core:icon identifier="actions-open" />
+									</f:link.action>
+									<f:link.action action="download" arguments="{job: job}" class="btn btn-default" title="Download translation file">
+										<core:icon identifier="actions-download" />
+									</f:link.action>
+									<f:if condition="{job.automated} && {job.processable}">
+										<a href="#" class="btn btn-default" data-eset-run-job="{job.uid}" title="Send to provider now">
+											<core:icon identifier="actions-play" />
+										</a>
 									</f:if>
-								</td>
-								<td><f:render partial="Job/StatusBadge" arguments="{status: job.status}" /></td>
-								<td><f:render partial="Job/ProgressBar" arguments="{job: job}" /></td>
-								<td class="col-control">
-									<div class="btn-group btn-group-sm">
-										<f:link.action action="show" arguments="{job: job}" class="btn btn-default" title="Details">
-											<core:icon identifier="actions-open" />
+									<f:if condition="{job.status} == 'failed'">
+										<f:link.action action="requeue" arguments="{job: job}" class="btn btn-default" title="Queue again">
+											<core:icon identifier="actions-refresh" />
 										</f:link.action>
-										<f:link.action action="download" arguments="{job: job}" class="btn btn-default" title="Download translation file">
-											<core:icon identifier="actions-download" />
-										</f:link.action>
-										<f:if condition="{job.automated} && {job.processable}">
-											<f:link.action action="run" arguments="{job: job}" class="btn btn-default" title="Send to provider now">
-												<core:icon identifier="actions-play" />
+									</f:if>
+									<f:if condition="{job.finished}">
+										<f:else>
+											<f:link.action action="cancel" arguments="{job: job}" class="btn btn-default" title="Cancel">
+												<core:icon identifier="actions-close" />
 											</f:link.action>
-										</f:if>
-										<f:if condition="{job.status} == 'failed'">
-											<f:link.action action="requeue" arguments="{job: job}" class="btn btn-default" title="Queue again">
-												<core:icon identifier="actions-refresh" />
-											</f:link.action>
-										</f:if>
-										<f:if condition="{job.finished}">
-											<f:else>
-												<f:link.action action="cancel" arguments="{job: job}" class="btn btn-default" title="Cancel">
-													<core:icon identifier="actions-close" />
-												</f:link.action>
-											</f:else>
-										</f:if>
-										<f:link.action action="delete" arguments="{job: job}" class="btn btn-default" title="Delete"
-											additionalAttributes="{onclick: 'return confirm(\'Delete this job?\');'}">
-											<core:icon identifier="actions-delete" />
-										</f:link.action>
-									</div>
+										</f:else>
+									</f:if>
+									<f:link.action action="delete" arguments="{job: job}" class="btn btn-default t3js-modal-trigger" title="Delete"
+												   additionalAttributes="{'data-title': 'Delete job', 'data-content': 'Delete this translation job? Content already written to the pages is not affected.', 'data-severity': 'warning', 'data-button-ok-text': 'Delete', 'data-button-close-text': 'Cancel'}">
+										<core:icon identifier="actions-delete" />
+									</f:link.action>
+								</div>
+							</td>
+						</tr>
+						<f:if condition="{job.errorMessage}">
+							<tr class="danger job-error-row">
+								<td colspan="7">
+									<details class="job-error-details">
+										<summary><small><strong>Error</strong> — show details</small></summary>
+										<small class="job-error-body">{job.errorMessage}</small>
+									</details>
 								</td>
 							</tr>
-							<f:if condition="{job.errorMessage}">
-								<tr class="danger">
-									<td colspan="7"><small><strong>Error:</strong> {job.errorMessage}</small></td>
-								</tr>
-							</f:if>
-						</f:for>
+						</f:if>
+					</f:for>
 					</tbody>
 				</table>
 			</div>
+			<f:if condition="{total} > {itemsPerPage}">
+				<nav>
+					<ul class="pagination" style="margin-top: 0;">
+						<li class="{f:if(condition: '{currentPage} == 1', then: 'disabled')}">
+							<f:if condition="{currentPage} > 1">
+								<f:then>
+									<f:link.action action="index" arguments="{filter: filter, currentPage: 1}">First</f:link.action>
+								</f:then>
+								<f:else>
+									<span>First</span>
+								</f:else>
+							</f:if>
+						</li>
+						<f:if condition="{currentPage} > 1">
+							<li>
+								<f:link.action action="index" arguments="{filter: filter, currentPage: '{currentPage - 1}'}">Previous</f:link.action>
+							</li>
+						</f:if>
+						<li class="disabled">
+							<span>Page {currentPage} / {numberOfPages} ({total})</span>
+						</li>
+						<f:if condition="{currentPage} < {numberOfPages}">
+							<li>
+								<f:link.action action="index" arguments="{filter: filter, currentPage: '{currentPage + 1}'}">Next</f:link.action>
+							</li>
+						</f:if>
+						<li class="{f:if(condition: '{currentPage} == {numberOfPages}', then: 'disabled')}">
+							<f:if condition="{currentPage} < {numberOfPages}">
+								<f:then>
+									<f:link.action action="index" arguments="{filter: filter, currentPage: numberOfPages}">Last</f:link.action>
+								</f:then>
+								<f:else>
+									<span>Last</span>
+								</f:else>
+							</f:if>
+						</li>
+					</ul>
+				</nav>
+			</f:if>
 		</f:then>
 		<f:else>
 			<div class="alert alert-info">No translation jobs match the current filter.</div>
 		</f:else>
 	</f:if>
-
 </f:section>
-
 </html>

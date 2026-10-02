@@ -34,6 +34,23 @@ class RecordCollectorService
     /** @var FlexFormService */
     protected $flexFormService;
 
+    /**
+     * Fields that never go to translation, regardless of TCA type.
+     * table => [field, ...]; "*" applies to every table.
+     */
+    protected const DEFAULT_EXCLUDED_FIELDS = [
+        '*' => ['path_segment', 'url_segment',
+            'tx_esetbase_imagepadding', 'tx_esetbase_speakinganchor',
+            'tx_esetbase_speakinganchor_text', 'tx_esetbase_speakinganchor_title'
+        ]
+    ];
+
+    protected function isExcludedByDefault(string $table, string $field): bool
+    {
+        return in_array($field, self::DEFAULT_EXCLUDED_FIELDS['*'] ?? [], true)
+            || in_array($field, self::DEFAULT_EXCLUDED_FIELDS[$table] ?? [], true);
+    }
+
     public function __construct(
         ConnectionPool $connectionPool,
         ConfigurationService $configuration,
@@ -47,7 +64,71 @@ class RecordCollectorService
     }
 
     /**
+     * Fields that are not rendered in the frontend (and therefore must not be
+     * translated) when another field of the same record holds one of the given
+     * values.
+     *
+     * table => field => [controlField => [values...]]
+     */
+    protected const DEFAULT_SUPPRESSED_FIELD_CONDITIONS = [
+        'tt_content' => [
+            // header_layout 100 = "Hidden": header is only an internal label.
+            // "Insert records" (shortcut) never renders its own header.
+            'header' => [
+                'header_layout' => ['100'],
+                'CType' => ['shortcut'],
+            ],
+        ],
+    ];
+
+    /** @var array<string, array<string, array<string, string[]>>>|null */
+    protected $suppressedFieldConditions;
+
+    /**
+     * @return array<string, array<string, array<string, string[]>>>
+     */
+    protected function getSuppressedFieldConditions(): array
+    {
+        if ($this->suppressedFieldConditions === null) {
+            $conditions = self::DEFAULT_SUPPRESSED_FIELD_CONDITIONS;
+            if (method_exists($this->configuration, 'getSuppressedFieldConditions')) {
+                $conditions = array_replace_recursive(
+                    $conditions,
+                    (array)$this->configuration->getSuppressedFieldConditions()
+                );
+            }
+            $this->suppressedFieldConditions = $conditions;
+        }
+
+        return $this->suppressedFieldConditions;
+    }
+
+    /**
+     * True when the field is hidden in the frontend because of another field's
+     * value (e.g. tt_content.header with header_layout = 100).
+     *
+     * @param array<string, mixed> $record
+     */
+    protected function isFieldSuppressed(string $table, string $field, array $record): bool
+    {
+        $conditions = $this->getSuppressedFieldConditions()[$table][$field] ?? [];
+        foreach ($conditions as $controlField => $values) {
+            if (!array_key_exists($controlField, $record)) {
+                continue;
+            }
+            $values = array_map('strval', (array)$values);
+            if (in_array((string)$record[$controlField], $values, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param string[] $skipCTypes tt_content CType values to leave out of this job
+     * @param array<string, int[]> $extraRecords table => uids of records outside the
+     *        page tree that are translated as well (referenced shared content)
      */
     public function collect(
         int $pageUid,
@@ -55,7 +136,8 @@ class RecordCollectorService
         TranslationTarget $target,
         int $depth = 0,
         bool $onlyUntranslated = true,
-        array $skipCTypes = []
+        array $skipCTypes = [],
+        array $extraRecords = []
     ): TranslationDataSet {
         $dataSet = new TranslationDataSet($source, $target, $pageUid);
         $pageUids = $this->resolvePageUids($pageUid, $source, $depth);
@@ -65,6 +147,10 @@ class RecordCollectorService
                 continue;
             }
             foreach ($this->fetchRecords($table, $pageUids, $source, $skipCTypes) as $record) {
+                $this->addRecordToDataSet($dataSet, $table, $record, $target, $onlyUntranslated);
+            }
+            $extraUids = array_values(array_filter(array_map('intval', (array)($extraRecords[$table] ?? []))));
+            foreach ($this->fetchRecordsByUid($table, $extraUids, $source, $skipCTypes) as $record) {
                 $this->addRecordToDataSet($dataSet, $table, $record, $target, $onlyUntranslated);
             }
         }
@@ -181,6 +267,51 @@ class RecordCollectorService
     }
 
     /**
+     * Records picked by uid (referenced shared content), with the same language
+     * and content type filters as {@see fetchRecords()}.
+     *
+     * @param int[] $uids
+     * @param string[] $skipCTypes
+     * @return array<int, array<string, mixed>>
+     */
+    protected function fetchRecordsByUid(string $table, array $uids, TranslationTarget $source, array $skipCTypes = []): array
+    {
+        if ($uids === [] || $table === 'pages') {
+            return [];
+        }
+        $queryBuilder = $this->connectionPool->getQueryBuilderForTable($table);
+        $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+
+        $constraints = [
+            $queryBuilder->expr()->in(
+                'uid',
+                $queryBuilder->createNamedParameter($uids, \TYPO3\CMS\Core\Database\Connection::PARAM_INT_ARRAY)
+            ),
+        ];
+        $languageField = (string)($GLOBALS['TCA'][$table]['ctrl']['languageField'] ?? '');
+        if ($languageField !== '') {
+            $constraints[] = $queryBuilder->expr()->eq(
+                $languageField,
+                $queryBuilder->createNamedParameter($source->getLanguageId(), \PDO::PARAM_INT)
+            );
+        }
+        $skipCTypes = array_values(array_filter($skipCTypes));
+        if ($table === 'tt_content' && $skipCTypes !== [] && isset($GLOBALS['TCA']['tt_content']['columns']['CType'])) {
+            $constraints[] = $queryBuilder->expr()->notIn(
+                'CType',
+                $queryBuilder->createNamedParameter($skipCTypes, \TYPO3\CMS\Core\Database\Connection::PARAM_STR_ARRAY)
+            );
+        }
+
+        return $queryBuilder
+            ->select('*')
+            ->from($table)
+            ->where(...$constraints)
+            ->execute()
+            ->fetchAll();
+    }
+
+    /**
      * The tt_content content types present in the page subtree, for the wizard's
      * "skip content types" checkboxes.
      *
@@ -278,10 +409,21 @@ class RecordCollectorService
             if (!isset($record[$field])) {
                 continue;
             }
+            // Field is not rendered (e.g. header with header_layout "hidden") -
+            // it is only an internal label, do not translate it.
+            if ($this->isFieldSuppressed($table, $field, $record)) {
+                continue;
+            }
+            $fieldConfig = $this->getEffectiveFieldConfig($table, $field, $fieldConfig, $record);
             $value = (string)$record[$field];
             if (trim($value) === '') {
                 continue;
             }
+            // Pure markup without any text (e.g. "<p>&nbsp;</p>") - nothing to translate
+            if (trim(html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5)) === '') {
+                continue;
+            }
+            $isHtml = $this->isHtmlField($fieldConfig) || $this->containsHtml($value);
             if ($onlyUntranslated) {
                 // Overlay: skip fields whose overlay record already holds a
                 // translation (value differs from the default language).
@@ -309,7 +451,7 @@ class RecordCollectorService
                 $uid,
                 $field,
                 $value,
-                $this->isHtmlField($fieldConfig),
+                $isHtml,
                 $this->getFieldLabel($table, $field),
                 $pageUid
             );
@@ -498,7 +640,21 @@ class RecordCollectorService
         if ($this->configuration->isFieldExcluded($table, $field)) {
             return false;
         }
+        if ($this->configuration->isFieldExcluded($table, $field)
+            || $this->isExcludedByDefault($table, $field)
+        ) {
+            return false;
+        }
+        // Internal editor note (tt_content.rowDescription, ...), never rendered
+        // in the frontend - also holds the ESET provenance notes.
+        if ($field === (string)($GLOBALS['TCA'][$table]['ctrl']['descriptionColumn'] ?? '')) {
+            return false;
+        }
         $type = (string)($config['type'] ?? '');
+        if ($type === 'slug' || !in_array($type, ['input', 'text'], true)) {
+            return false;
+        }
+
         if (!in_array($type, ['input', 'text'], true)) {
             return false;
         }
@@ -577,5 +733,38 @@ class RecordCollectorService
         }
 
         return $label;
+    }
+
+    /**
+     * Field config including the record type's columnsOverrides
+     * (e.g. tt_content.bodytext gets enableRichtext only for text/textmedia/...).
+     *
+     * @param array<string, mixed> $fieldConfig base config from TCA columns
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    protected function getEffectiveFieldConfig(string $table, string $field, array $fieldConfig, array $record): array
+    {
+        $typeField = (string)($GLOBALS['TCA'][$table]['ctrl']['type'] ?? '');
+        // "field:foreignField" type pointers are not resolved here
+        if ($typeField === '' || strpos($typeField, ':') !== false) {
+            return $fieldConfig;
+        }
+        $type = (string)($record[$typeField] ?? '');
+        $override = $GLOBALS['TCA'][$table]['types'][$type]['columnsOverrides'][$field]['config'] ?? null;
+        if (!is_array($override)) {
+            return $fieldConfig;
+        }
+
+        return array_replace_recursive($fieldConfig, $override);
+    }
+
+    /**
+     * Fallback for fields that are not RTE-enabled in TCA but still contain
+     * markup (imported content, <br> in headers, legacy data ...).
+     */
+    protected function containsHtml(string $value): bool
+    {
+        return $value !== strip_tags($value);
     }
 }

@@ -82,14 +82,13 @@ class XliffFormat extends AbstractFormat
         $body = $document->createElementNS(self::XLIFF_NS, 'body');
         $file->appendChild($body);
 
-        foreach ($dataSet->getUnitsGroupedByRecord() as $recordKey => $units) {
-            $group = $document->createElementNS(self::XLIFF_NS, 'group');
-            $group->setAttribute('id', $recordKey);
-            $group->setAttribute('restype', 'row');
-            $body->appendChild($group);
-
+        // Units directly under <body>, no <group> per record: <group> is valid
+        // XLIFF 1.2, but many viewers/tools only read body > trans-unit. The
+        // record is still identifiable from each unit's id / eset:* attributes,
+        // and import() reads trans-units at any depth (older grouped files too).
+        foreach ($dataSet->getUnitsGroupedByRecord() as $units) {
             foreach ($units as $unit) {
-                $group->appendChild($this->createTransUnit($document, $unit));
+                $body->appendChild($this->createTransUnit($document, $unit));
             }
         }
 

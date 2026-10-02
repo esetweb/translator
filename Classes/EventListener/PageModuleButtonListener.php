@@ -70,7 +70,10 @@ class PageModuleButtonListener
         // "Request translation" (automated) only appears when a translation
         // provider is actually configured. The manual export/import button is
         // always available.
-        if ($this->providerRegistry->hasAnyAvailable()) {
+        if (
+            $this->providerRegistry->hasAnyAvailable()
+            && $this->permissionService->canRequestTranslation()
+        ) {
             $buttons[ButtonBar::BUTTON_POSITION_LEFT][5][] = $buttonBar->makeLinkButton()
                 ->setHref('#')
                 ->setTitle($this->translate('button.requestTranslation'))
@@ -82,18 +85,25 @@ class PageModuleButtonListener
                 ]);
         }
 
-        $buttons[ButtonBar::BUTTON_POSITION_LEFT][5][] = $buttonBar->makeLinkButton()
-            ->setHref('#')
-            ->setTitle($this->translate('button.exchange'))
-            ->setShowLabelText(true)
-            ->setIcon($this->iconFactory->getIcon('eset-translator-exchange', Icon::SIZE_SMALL))
-            ->setDataAttributes([
-                'eset-translator-action' => 'exchange',
-                'eset-translator-page' => (string)$pageUid,
-            ]);
+        if ($this->permissionService->canExchangeTranslation()) {
+            $buttons[ButtonBar::BUTTON_POSITION_LEFT][5][] = $buttonBar->makeLinkButton()
+                ->setHref('#')
+                ->setTitle($this->translate('button.exchange'))
+                ->setShowLabelText(true)
+                ->setIcon($this->iconFactory->getIcon('eset-translator-exchange', Icon::SIZE_SMALL))
+                ->setDataAttributes([
+                    'eset-translator-action' => 'exchange',
+                    'eset-translator-page' => (string)$pageUid,
+                ]);
+            }
 
-        GeneralUtility::makeInstance(PageRenderer::class)
-            ->loadRequireJsModule('TYPO3/CMS/EsetTranslator/TranslationWizard');
+        if (
+            $this->permissionService->canRequestTranslation()
+            || $this->permissionService->canExchangeTranslation()
+        ) {
+            GeneralUtility::makeInstance(PageRenderer::class)
+                ->loadRequireJsModule('TYPO3/CMS/EsetTranslator/TranslationWizard');
+        }
 
         return $buttons;
     }

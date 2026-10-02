@@ -42,6 +42,12 @@ class JobService
     /** @var ConfigurationService */
     protected $configuration;
 
+    /** @var ReferenceService */
+    protected $referenceService;
+
+    /** @var string[] What the last createJob() changed on referenced content */
+    protected $lastReferenceReport = [];
+
     public function __construct(
         JobRepository $jobRepository,
         PersistenceManagerInterface $persistenceManager,
@@ -50,7 +56,8 @@ class JobService
         SiteLanguageService $siteLanguageService,
         ProviderRegistry $providerRegistry,
         FormatRegistry $formatRegistry,
-        ConfigurationService $configuration
+        ConfigurationService $configuration,
+        ReferenceService $referenceService
     ) {
         $this->jobRepository = $jobRepository;
         $this->persistenceManager = $persistenceManager;
@@ -60,10 +67,15 @@ class JobService
         $this->providerRegistry = $providerRegistry;
         $this->formatRegistry = $formatRegistry;
         $this->configuration = $configuration;
+        $this->referenceService = $referenceService;
     }
 
     /**
-     * @param array{mode?: string, provider?: string, format?: string, depth?: int, title?: string, onlyUntranslated?: bool, skipCTypes?: string[]} $options
+     * $options['references'] ("<shortcutUid>:<refUid>" => action) turns on the
+     * handling of "Insert records" references (see ReferenceService). Without it
+     * referenced content outside the page tree is left out, as before.
+     *
+     * @param array{mode?: string, provider?: string, format?: string, depth?: int, title?: string, onlyUntranslated?: bool, skipCTypes?: string[], references?: array<string, string>} $options
      */
     public function createJob(int $pageUid, string $sourceKey, string $targetKey, array $options = []): Job
     {
@@ -78,7 +90,18 @@ class JobService
         $onlyUntranslated = (bool)($options['onlyUntranslated'] ?? true);
         $skipCTypes = array_values(array_filter((array)($options['skipCTypes'] ?? [])));
 
-        $dataSet = $this->recordCollector->collect($pageUid, $source, $target, $depth, $onlyUntranslated, $skipCTypes);
+        // Structural changes (copy / relink) happen before collecting, so the
+        // copies are picked up like any other content of the page.
+        $extraRecords = [];
+        $this->lastReferenceReport = [];
+        if (isset($options['references']) && is_array($options['references'])) {
+            $entries = $this->referenceService->analyze($pageUid, $source, $target, $depth);
+            $applied = $this->referenceService->apply($entries, $options['references']);
+            $extraRecords = $applied['extraRecords'];
+            $this->lastReferenceReport = $applied['report'];
+        }
+
+        $dataSet = $this->recordCollector->collect($pageUid, $source, $target, $depth, $onlyUntranslated, $skipCTypes, $extraRecords);
         if (count($dataSet) === 0) {
             throw new \RuntimeException(
                 'Nothing to translate: no translatable content was found for the selected page and language.',
@@ -131,6 +154,14 @@ class JobService
         }
 
         return $dataSet;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getLastReferenceReport(): array
+    {
+        return $this->lastReferenceReport;
     }
 
     public function markFailed(Job $job, string $message): void

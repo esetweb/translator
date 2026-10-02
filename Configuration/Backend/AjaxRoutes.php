@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use ESET\Translator\Controller\JobAjaxController;
 use ESET\Translator\Controller\TranslationWizardController;
 
 /**
@@ -12,6 +13,10 @@ return [
     'eset_translator_options' => [
         'path' => '/eset-translator/options',
         'target' => TranslationWizardController::class . '::getOptionsAction',
+    ],
+    'eset_translator_analyze' => [
+        'path' => '/eset-translator/analyze',
+        'target' => TranslationWizardController::class . '::analyzeAction',
     ],
     'eset_translator_create_job' => [
         'path' => '/eset-translator/job/create',
@@ -26,5 +31,14 @@ return [
         'path' => '/eset-translator/import',
         'target' => TranslationWizardController::class . '::importAction',
         'methods' => ['POST'],
+    ],
+    'eset_translator_job_run' => [
+        'path' => '/eset-translator/job/run',
+        'target' => JobAjaxController::class . '::runAction',
+        'methods' => ['POST'],
+    ],
+    'eset_translator_job_status' => [
+        'path' => '/eset-translator/job/status',
+        'target' => JobAjaxController::class . '::statusAction',
     ],
 ];

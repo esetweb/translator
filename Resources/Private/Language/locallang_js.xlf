@@ -69,6 +69,123 @@
 			<trans-unit id="eset_translator.requestFailed">
 				<source>The request failed. Please check the TYPO3 log.</source>
 			</trans-unit>
+			<trans-unit id="eset_translator.step.summary">
+				<source>Summary</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.source">
+				<source>Source</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.target">
+				<source>Target</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.depth">
+				<source>Subpage levels</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.onlyUntranslated">
+				<source>Only untranslated fields</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.skipped">
+				<source>Skipped content types</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.references">
+				<source>Referenced content</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.summary.noReferences">
+				<source>none</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.yes">
+				<source>yes</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.no">
+				<source>no</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.none">
+				<source>No "Insert records" element references content outside this page.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noProviderForPair">
+				<source>No configured translation provider supports this language pair. Use Export / import instead.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noExchange">
+				<source>You have no permission to export or import translations.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.tab.export">
+				<source>Export</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.tab.import">
+				<source>Import</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.step.languages">
+				<source>Languages</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.step.content">
+				<source>Content</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.step.references">
+				<source>References</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.back">
+				<source>Back</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.next">
+				<source>Next</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.createAndDownload">
+				<source>Create job and download file</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.found">
+				<source>"Insert records" elements on this page reference content stored elsewhere. Decide how to handle it in the next step.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.intro">
+				<source>Referenced content of another site cannot be translated where it is (its language ids mean different languages). Copy it onto the page to translate it.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.introInPlace">
+				<source>The target is written in place. Content of another site must never be overwritten - link to a translated copy in this site, or copy it onto the page.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.copyNote">
+				<source>Copies and links are created when the job is started. When anything is copied, the "Insert records" element is deleted (restorable from the recycler) and replaced, in the same order, by the copies and by new "Insert records" elements for the rest.</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.bulk">
+				<source>Set all to</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.shortcut">
+				<source>Insert records</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.onPage">
+				<source>on page</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.noTitle">
+				<source>no title</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.via">
+				<source>via "Insert records"</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.hidden">
+				<source>hidden</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.scope.inJob">
+				<source>Translated with the page</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.scope.targetSite">
+				<source>Shared content of this site</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.scope.foreign">
+				<source>Content of another site</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.scope.missing">
+				<source>Record no longer exists</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.action.translate">
+				<source>Translate the original record</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.action.copy">
+				<source>Copy onto this page and translate the copy</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.action.relink">
+				<source>Link to existing copy</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.ref.action.skip">
+				<source>Leave as is (not translated)</source>
+			</trans-unit>
 		</body>
 	</file>
 </xliff>

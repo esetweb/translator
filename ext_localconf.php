@@ -48,3 +48,21 @@ defined('TYPO3_MODE') || die();
         '@import "EXT:' . $extensionKey . '/Configuration/TsConfig/User/All.tsconfig"'
     );
 })();
+
+
+
+$GLOBALS['TYPO3_CONF_VARS']['BE']['customPermOptions']['tx_esettranslator'] = [
+    'header' => 'LLL:EXT:eset_translator/Resources/Private/Language/locallang.xlf:permissions.header',
+    'items' => [
+        'requestTranslation' => [
+            'LLL:EXT:eset_translator/Resources/Private/Language/locallang.xlf:permissions.requestTranslation',
+            'eset-translator-translate',
+            'LLL:EXT:eset_translator/Resources/Private/Language/locallang.xlf:permissions.requestTranslation.description',
+        ],
+        'exchangeTranslation' => [
+            'LLL:EXT:eset_translator/Resources/Private/Language/locallang.xlf:permissions.exchange',
+            'eset-translator-exchange',
+            'LLL:EXT:eset_translator/Resources/Private/Language/locallang.xlf:permissions.exchange.description',
+        ],
+    ],
+];

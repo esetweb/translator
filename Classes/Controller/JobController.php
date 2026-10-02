@@ -1,10 +1,10 @@
 <?php
-
 declare(strict_types=1);
 
 namespace ESET\Translator\Controller;
 
 use ESET\Translator\Domain\Model\Job;
+use ESET\Translator\Domain\Model\JobItem;
 use ESET\Translator\Domain\Repository\JobRepository;
 use ESET\Translator\Format\FormatRegistry;
 use ESET\Translator\Provider\ProviderRegistry;
@@ -16,8 +16,8 @@ use ESET\Translator\Service\SiteLanguageService;
 use ESET\Translator\Service\TranslationRunner;
 use TYPO3\CMS\Backend\View\BackendTemplateView;
 use TYPO3\CMS\Core\Messaging\AbstractMessage;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
+use TYPO3\CMS\Extbase\Mvc\View\ViewInterface;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 
 /**
@@ -26,6 +26,8 @@ use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
  */
 class JobController extends ActionController
 {
+    private const ITEMS_PER_PAGE = 25;
+
     /** @var string */
     protected $defaultViewObjectName = BackendTemplateView::class;
 
@@ -78,13 +80,16 @@ class JobController extends ActionController
         $this->formatRegistry = $formatRegistry;
     }
 
-    protected function initializeView(\TYPO3\CMS\Extbase\Mvc\View\ViewInterface $view): void
+    protected function initializeView(ViewInterface $view): void
     {
         if (!$view instanceof BackendTemplateView) {
             return;
         }
         $view->getModuleTemplate()->getPageRenderer()->loadRequireJsModule(
             'TYPO3/CMS/EsetTranslator/TranslationWizard'
+        );
+        $view->getModuleTemplate()->getPageRenderer()->loadRequireJsModule(
+            'TYPO3/CMS/EsetTranslator/JobActions'
         );
         $view->assign('providersAvailable', $this->providerRegistry->hasAnyAvailable());
         $view->assign('availableProviders', $this->providerRegistry->getAvailable());
@@ -93,17 +98,33 @@ class JobController extends ActionController
     /**
      * @param array{status?: string, site?: string, pageUid?: int} $filter
      */
-    public function indexAction(array $filter = []): void
+    public function indexAction(array $filter = [], int $currentPage = 1): void
     {
         $onlyOwn = !($GLOBALS['BE_USER']->isAdmin() ?? false);
         if ($onlyOwn) {
             $filter['backendUserId'] = (int)($GLOBALS['BE_USER']->user['uid'] ?? 0);
         }
 
+        $itemsPerPage = self::ITEMS_PER_PAGE;
+        $currentPage = max(1, $currentPage);
+        $total = $this->jobRepository->countByFilter($filter);
+        $numberOfPages = max(1, (int)ceil($total / $itemsPerPage));
+        if ($currentPage > $numberOfPages) {
+            $currentPage = $numberOfPages;
+        }
+
         $this->view->assignMultiple([
-            'jobs' => $this->jobRepository->findByFilter($filter),
+            'jobs' => $this->jobRepository->findByFilter(
+                $filter,
+                $itemsPerPage,
+                ($currentPage - 1) * $itemsPerPage
+            ),
             'filter' => $filter,
-            'statusCounts' => $this->jobRepository->countByStatus(),
+            'currentPage' => $currentPage,
+            'numberOfPages' => $numberOfPages,
+            'total' => $total,
+            'itemsPerPage' => $itemsPerPage,
+            'statusCounts' => $this->jobRepository->countByStatus($filter),
             'sites' => $this->siteLanguageService->groupBySite($this->permissionService->getAllowedTargets()),
             'statuses' => [
                 Job::STATUS_NEW,
@@ -139,7 +160,6 @@ class JobController extends ActionController
             $job->setFormat($format);
         }
         $export = $this->exportService->exportJob($job);
-
         $this->response->setHeader('Content-Type', $export['contentType'], true);
         $this->response->setHeader(
             'Content-Disposition',
@@ -156,7 +176,6 @@ class JobController extends ActionController
         $this->assertAccess($job);
         $uploadedFile = $_FILES['tx_esettranslator_eset_esettranslatorjobs']['tmp_name']['file'] ?? '';
         $fileName = $_FILES['tx_esettranslator_eset_esettranslatorjobs']['name']['file'] ?? '';
-
         if (!is_string($uploadedFile) || $uploadedFile === '' || !is_uploaded_file($uploadedFile)) {
             $this->addFlashMessage(
                 $this->translate('module.import.noFile'),
@@ -164,7 +183,6 @@ class JobController extends ActionController
                 AbstractMessage::ERROR
             );
             $this->redirect('show', null, null, ['job' => $job]);
-
             return;
         }
 
@@ -177,7 +195,6 @@ class JobController extends ActionController
             $job->setErrorMessage($result->hasErrors() ? implode(' | ', $result->getErrors()) : '');
             $job->setFinishedAt(new \DateTime());
             $this->jobService->update($job);
-
             $this->addFlashMessage(
                 $result->getSummary(),
                 '',
@@ -186,7 +203,6 @@ class JobController extends ActionController
         } catch (\Throwable $exception) {
             $this->addFlashMessage($exception->getMessage(), '', AbstractMessage::ERROR);
         }
-
         $this->redirect('show', null, null, ['job' => $job]);
     }
 
@@ -196,10 +212,8 @@ class JobController extends ActionController
         if (!$job->isAutomated()) {
             $this->addFlashMessage($this->translate('module.run.notAutomated'), '', AbstractMessage::WARNING);
             $this->redirect('show', null, null, ['job' => $job]);
-
             return;
         }
-
         $job = $this->translationRunner->run($job);
         $this->addFlashMessage(
             $job->getStatus() === Job::STATUS_FAILED ? $job->getErrorMessage() : $this->translate('module.run.done'),
@@ -213,15 +227,14 @@ class JobController extends ActionController
     {
         $this->assertAccess($job);
         foreach ($job->getItems() as $item) {
-            if ($item->getStatus() === \ESET\Translator\Domain\Model\JobItem::STATUS_FAILED) {
-                $item->setStatus(\ESET\Translator\Domain\Model\JobItem::STATUS_PENDING);
+            if ($item->getStatus() === JobItem::STATUS_FAILED) {
+                $item->setStatus(JobItem::STATUS_PENDING);
                 $item->setErrorMessage('');
             }
         }
         $job->setStatus(Job::STATUS_QUEUED);
         $job->setErrorMessage('');
         $this->jobService->update($job);
-
         $this->addFlashMessage($this->translate('module.requeue.done'));
         $this->redirect('index');
     }
@@ -232,7 +245,6 @@ class JobController extends ActionController
         $job->setStatus(Job::STATUS_CANCELLED);
         $job->setFinishedAt(new \DateTime());
         $this->jobService->update($job);
-
         $this->addFlashMessage($this->translate('module.cancel.done'));
         $this->redirect('index');
     }
@@ -247,22 +259,9 @@ class JobController extends ActionController
 
     protected function assertAccess(Job $job): void
     {
-        $backendUser = $GLOBALS['BE_USER'] ?? null;
-        if ($backendUser === null) {
-            throw new \RuntimeException('No backend user.', 1710000150);
+        if (!$this->permissionService->canAccessJob($job)) {
+            throw new \RuntimeException('Access denied to this translation job.', 1710000151);
         }
-        if ($backendUser->isAdmin()) {
-            return;
-        }
-        if ($job->getBackendUserId() === (int)($backendUser->user['uid'] ?? 0)) {
-            return;
-        }
-        $target = $this->siteLanguageService->findTarget($job->getTargetKey());
-        if ($target !== null && $this->permissionService->isTargetAllowed($target)) {
-            return;
-        }
-
-        throw new \RuntimeException('Access denied to this translation job.', 1710000151);
     }
 
     protected function translate(string $key, array $arguments = []): string

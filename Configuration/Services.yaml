@@ -58,6 +58,9 @@ services:
   ESET\Translator\Controller\JobController:
     public: true
 
+  ESET\Translator\Controller\JobAjaxController:
+    public: true
+
   # v10.4: hooked via ButtonBar::getButtonsHook in ext_localconf.php (no
   # ModifyButtonBarEvent before v11). public so makeInstance() injects its deps.
   ESET\Translator\EventListener\PageModuleButtonListener:
@@ -70,4 +73,14 @@ services:
     tags:
       - name: 'console.command'
         command: 'esettranslator:process'
+        schedulable: true
+
+  ESET\Translator\Service\JobCleanupService:
+    public: true
+
+  ESET\Translator\Command\JobCleanupCommand:
+    tags:
+      - name: console.command
+        command: 'esettranslator:cleanup-jobs'
+        description: 'Retire finished translation jobs and purge soft-deleted records'
         schedulable: true

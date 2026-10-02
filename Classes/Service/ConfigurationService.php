@@ -178,4 +178,12 @@ class ConfigurationService
 
         return $timeout > 0 ? $timeout : 30;
     }
+
+    /**
+     * @return array<string, array<string, array<string, string[]>>>
+     */
+    public function getSuppressedFieldConditions(): array
+    {
+        return (array)($this->settings['suppressedFieldConditions'] ?? []);
+    }
 }
