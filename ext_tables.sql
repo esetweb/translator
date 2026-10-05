@@ -48,3 +48,12 @@ CREATE TABLE tx_esettranslator_domain_model_jobitem (
     KEY job (job),
     KEY record (table_name,record_uid)
 );
+
+#
+# "Insert records" analysis looks up copies of a record by t3_origuid
+# (ReferenceService::findCopiesInSite). The core has no index on it - without
+# this every lookup is a full scan of tt_content.
+#
+CREATE TABLE tt_content (
+	KEY eset_translator_origuid (t3_origuid)
+);

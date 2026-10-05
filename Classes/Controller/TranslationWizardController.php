@@ -211,11 +211,18 @@ class TranslationWizardController
             $target = $this->siteLanguageService->getTarget((string)($params['target'] ?? ''));
             $this->permissionService->assertTranslationAllowed($pageUid, $source, $target);
 
+            $started = microtime(true);
+            $contentTypes = $this->recordCollector->collectContentTypes($pageUid, $source, $depth);
+            $references = $this->referenceService->analyze($pageUid, $source, $target, $depth);
+
             return new JsonResponse([
                 'success' => true,
-                'contentTypes' => $this->recordCollector->collectContentTypes($pageUid, $source, $depth),
-                'references' => $this->referenceService->analyze($pageUid, $source, $target, $depth),
+                'contentTypes' => $contentTypes,
+                'references' => $references,
                 'inPlace' => $target->getLanguageId() === 0,
+                // Server time of the analysis in ms - shown in the browser
+                // console, to spot slow analyses on large installations.
+                'duration' => (int)round((microtime(true) - $started) * 1000),
             ]);
         } catch (\Throwable $exception) {
             return $this->error($exception->getMessage());

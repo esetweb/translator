@@ -108,6 +108,9 @@
 			<trans-unit id="eset_translator.analyzing">
 				<source>Analyzing page content …</source>
 			</trans-unit>
+			<trans-unit id="eset_translator.analyzeTimeout">
+				<source>The page analysis did not finish within 90 seconds. The server may be overloaded, or the database is missing the index of this extension (Install Tool → Analyze Database Structure).</source>
+			</trans-unit>
 			<trans-unit id="eset_translator.noJson">
 				<source>The server did not answer with JSON - the backend session may have expired (log in again) or the caches need to be flushed.</source>
 			</trans-unit>

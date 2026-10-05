@@ -93,10 +93,28 @@ define([
     return TranslationWizard.call('eset_translator_options', 'get', { page: pageUid });
   };
 
+  // The analysis normally takes well under a second; give up visibly instead
+  // of waiting for a server / proxy timeout with a spinner forever.
+  var ANALYZE_TIMEOUT = 90000;
+
   TranslationWizard.analyze = function (data) {
-    return TranslationWizard.call('eset_translator_analyze', 'get', {
+    var request = TranslationWizard.call('eset_translator_analyze', 'get', {
       page: data.page, source: data.source, target: data.target, depth: data.depth || 0
+    }).then(function (analysis) {
+      if (analysis && analysis.duration !== undefined && window.console) {
+        window.console.info('[ESET Translator] page analysis took ' + analysis.duration + ' ms on the server');
+      }
+      return analysis;
     });
+    var timeout = new Promise(function (resolve, reject) {
+      window.setTimeout(function () {
+        reject(new Error(TranslationWizard.lang('eset_translator.analyzeTimeout',
+          'The page analysis did not finish within 90 seconds. The server may be overloaded, or the database '
+          + 'is missing the index of this extension (Install Tool → Analyze Database Structure).')));
+      }, ANALYZE_TIMEOUT);
+    });
+
+    return Promise.race([request, timeout]);
   };
 
   TranslationWizard.escape = function (value) {
