@@ -58,6 +58,12 @@ class ReferenceService
     /** @var array<int, string> pid => site identifier ('' = no site) */
     protected $siteCache = [];
 
+    /** @var array<string, array<int, true>> site identifier => page uids of the site */
+    protected $sitePageCache = [];
+
+    /** @var array<int, array<int, array<string, mixed>>> original uid => its copies in the target site (current analyze()) */
+    protected $copiesInTargetSite = [];
+
     public function __construct(
         ConnectionPool $connectionPool,
         SiteLanguageService $siteLanguageService,
@@ -82,8 +88,9 @@ class ReferenceService
             return [];
         }
         $pageUids = $this->recordCollector->resolvePageUids($pageUid, $source, $depth);
-        $entries = [];
 
+        // Pass 1: every (shortcut, rendered record) pair.
+        $pairs = [];
         foreach ($this->fetchShortcuts($pageUids, $source) as $shortcut) {
             $shortcutUid = (int)$shortcut['uid'];
             $seenLeaves = [];
@@ -94,9 +101,23 @@ class ReferenceService
                         continue;
                     }
                     $seenLeaves[$leaf['uid']] = true;
-                    $entries[] = $this->buildEntry($shortcut, $leaf['uid'], $topUid, $leaf['via'], $pageUids, $target);
+                    $pairs[] = [$shortcut, $leaf['uid'], $topUid, $leaf['via']];
                 }
             }
+        }
+        if ($pairs === []) {
+            return [];
+        }
+
+        // Pass 2: copies in the target site for all records at once - one query,
+        // independent of how often the content was copied across sites.
+        $this->copiesInTargetSite = $target->getLanguageId() === 0
+            ? $this->findCopiesInSite(array_column($pairs, 1), $target)
+            : [];
+
+        $entries = [];
+        foreach ($pairs as [$shortcut, $refUid, $topUid, $via]) {
+            $entries[] = $this->buildEntry($shortcut, $refUid, $topUid, $via, $pageUids, $target);
         }
 
         return $entries;
@@ -487,7 +508,7 @@ class ReferenceService
         // target site *is* the translation. For overlay targets the frontend
         // overlays whatever is referenced, so a copy is the safe choice.
         if ($target->getLanguageId() === 0) {
-            foreach ($this->findCopiesInSite($refUid, $target->getSiteIdentifier()) as $copy) {
+            foreach ($this->copiesInTargetSite[$refUid] ?? [] as $copy) {
                 $actions[] = [
                     'value' => self::ACTION_RELINK_PREFIX . $copy['uid'],
                     'uid' => (int)$copy['uid'],
@@ -557,38 +578,109 @@ class ReferenceService
     }
 
     /**
-     * Records copied from $refUid (t3_origuid) that live in the given site.
+     * Records copied (t3_origuid) from any of $refUids that live in the target
+     * site, grouped by the original's uid, newest first.
      *
-     * @return array<int, array<string, mixed>>
+     * Content of this installation is copied into many sites, so one record can
+     * have hundreds of copies. Resolving the site of every copy (rootline per
+     * pid) does not scale - the copies are matched against the page uids of
+     * the target site instead, which are resolved once per request.
+     *
+     * @param int[] $refUids
+     * @return array<int, array<int, array<string, mixed>>>
      */
-    protected function findCopiesInSite(int $refUid, string $siteIdentifier): array
+    protected function findCopiesInSite(array $refUids, TranslationTarget $target): array
     {
         $origUidField = (string)($GLOBALS['TCA'][self::TABLE]['ctrl']['origUid'] ?? '');
-        if ($origUidField === '' || $siteIdentifier === '') {
+        $refUids = array_values(array_unique(array_filter(array_map('intval', $refUids))));
+        if ($origUidField === '' || $refUids === [] || $target->getRootPageId() <= 0) {
             return [];
         }
+        $sitePages = $this->getSitePageUids($target);
+
         $queryBuilder = $this->connectionPool->getQueryBuilderForTable(self::TABLE);
         $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
         $constraints = [
-            $queryBuilder->expr()->eq($origUidField, $queryBuilder->createNamedParameter($refUid, \PDO::PARAM_INT)),
+            $queryBuilder->expr()->in(
+                $origUidField,
+                $queryBuilder->createNamedParameter($refUids, \TYPO3\CMS\Core\Database\Connection::PARAM_INT_ARRAY)
+            ),
         ];
         $languageField = (string)($GLOBALS['TCA'][self::TABLE]['ctrl']['languageField'] ?? '');
         if ($languageField !== '') {
             $constraints[] = $queryBuilder->expr()->eq($languageField, $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT));
         }
 
-        $rows = $queryBuilder
+        $statement = $queryBuilder
             ->select('*')
             ->from(self::TABLE)
             ->where(...$constraints)
             ->orderBy('uid', 'DESC')
-            ->execute()
-            ->fetchAll();
+            ->execute();
 
-        return array_values(array_filter($rows, function (array $row) use ($siteIdentifier): bool {
-            return $this->getSiteIdentifier((int)$row['pid']) === $siteIdentifier;
-        }));
+        $copies = [];
+        while ($row = $statement->fetch()) {
+            if (isset($sitePages[(int)$row['pid']])) {
+                $copies[(int)$row[$origUidField]][] = $row;
+            }
+        }
+
+        return $copies;
+    }
+
+    /**
+     * uid => true for every page of the target's site (default language), by
+     * walking the tree level by level from the site root. Subtrees that are
+     * roots of other sites are excluded. One query per tree level.
+     *
+     * @return array<int, true>
+     */
+    protected function getSitePageUids(TranslationTarget $target): array
+    {
+        $siteIdentifier = $target->getSiteIdentifier();
+        if (isset($this->sitePageCache[$siteIdentifier])) {
+            return $this->sitePageCache[$siteIdentifier];
+        }
+
+        $otherRoots = [];
+        foreach ($this->siteLanguageService->getAllTargets() as $candidate) {
+            if ($candidate->getSiteIdentifier() !== $siteIdentifier && $candidate->getRootPageId() > 0) {
+                $otherRoots[$candidate->getRootPageId()] = true;
+            }
+        }
+
+        $rootPageId = $target->getRootPageId();
+        $pages = [$rootPageId => true];
+        $level = [$rootPageId];
+        $languageField = (string)($GLOBALS['TCA']['pages']['ctrl']['languageField'] ?? '');
+        for ($depth = 0; $level !== [] && $depth < 100; $depth++) {
+            $queryBuilder = $this->connectionPool->getQueryBuilderForTable('pages');
+            $queryBuilder->getRestrictions()->removeAll()->add(GeneralUtility::makeInstance(DeletedRestriction::class));
+            $queryBuilder
+                ->select('uid')
+                ->from('pages')
+                ->where($queryBuilder->expr()->in(
+                    'pid',
+                    $queryBuilder->createNamedParameter($level, \TYPO3\CMS\Core\Database\Connection::PARAM_INT_ARRAY)
+                ));
+            if ($languageField !== '') {
+                $queryBuilder->andWhere(
+                    $queryBuilder->expr()->eq($languageField, $queryBuilder->createNamedParameter(0, \PDO::PARAM_INT))
+                );
+            }
+            $next = [];
+            foreach ($queryBuilder->execute()->fetchAll() as $row) {
+                $uid = (int)$row['uid'];
+                if (isset($pages[$uid]) || isset($otherRoots[$uid])) {
+                    continue;
+                }
+                $pages[$uid] = true;
+                $next[] = $uid;
+            }
+            $level = $next;
+        }
+
+        return $this->sitePageCache[$siteIdentifier] = $pages;
     }
 
     /**

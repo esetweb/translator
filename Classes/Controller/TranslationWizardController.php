@@ -213,7 +213,22 @@ class TranslationWizardController
 
             $started = microtime(true);
             $contentTypes = $this->recordCollector->collectContentTypes($pageUid, $source, $depth);
+            $afterContentTypes = microtime(true);
             $references = $this->referenceService->analyze($pageUid, $source, $target, $depth);
+            $finished = microtime(true);
+
+            if ($finished - $started > 5) {
+                GeneralUtility::makeInstance(\TYPO3\CMS\Core\Log\LogManager::class)
+                    ->getLogger(__CLASS__)
+                    ->warning('Slow page analysis', [
+                        'page' => $pageUid,
+                        'depth' => $depth,
+                        'target' => $target->getKey(),
+                        'contentTypesMs' => (int)round(($afterContentTypes - $started) * 1000),
+                        'referencesMs' => (int)round(($finished - $afterContentTypes) * 1000),
+                        'references' => count($references),
+                    ]);
+            }
 
             return new JsonResponse([
                 'success' => true,

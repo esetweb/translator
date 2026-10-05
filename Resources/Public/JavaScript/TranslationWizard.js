@@ -538,14 +538,38 @@ define([
     );
   };
 
+  /**
+   * Resets the core MultiStepWizard singleton to its initial state.
+   *
+   * TYPO3 10 bug: on close, Modal's own "hidden" handler removes the modal
+   * element first - jQuery drops all handlers of its children, including the
+   * carousel's "wizard-dismissed" handler that should reset the wizard. The
+   * wizard then keeps its old slides and carousel, and the next wizard shows
+   * the content of the step where the previous one was closed.
+   */
+  TranslationWizard.resetMultiStepWizard = function () {
+    if (MultiStepWizard.originalSetup) {
+      MultiStepWizard.setup = $.extend(true, {}, MultiStepWizard.originalSetup);
+    }
+  };
+
   TranslationWizard.openRequestWizard = function (options, pageUid) {
+    // Never build on leftovers of a previously closed wizard.
+    TranslationWizard.resetMultiStepWizard();
     var title = TranslationWizard.lang('eset_translator.requestTranslation') + ': ' + options.page.title;
-    var state = { analysis: null, analysisKey: '', bound: false };
+    // closed: the editor closed the wizard. MultiStepWizard is a singleton that
+    // resets itself on close, so callbacks of requests still running must not
+    // touch it any more - it may already belong to the next wizard.
+    var state = { analysis: null, analysisKey: '', bound: false, closed: false };
 
     // MultiStepWizard locks "next" right after a slide callback ran, so
     // decisions about "next" are deferred to the next tick.
     var defer = function (fn) {
-      window.setTimeout(fn, 0);
+      window.setTimeout(function () {
+        if (!state.closed) {
+          fn();
+        }
+      }, 0);
     };
     var modalOf = function ($slide) {
       return $($slide).closest('.modal');
@@ -570,6 +594,12 @@ define([
         var $modal = modalOf($slide);
         if (!state.bound) {
           state.bound = true;
+          $modal.one('hidden.bs.modal', function () {
+            state.closed = true;
+            // The core does not manage to reset the wizard on close (see
+            // resetMultiStepWizard()) - do it here, also for other users of it.
+            TranslationWizard.resetMultiStepWizard();
+          });
           // Slide content is rendered from HTML strings - delegate on the modal.
           $modal.on('change', '[name="source"], [name="target"]', function () {
             if (MultiStepWizard.setup.$carousel.data('currentIndex') === 0) {
@@ -632,6 +662,9 @@ define([
             + '</div>'
           );
           TranslationWizard.analyze(data).then(function (analysis) {
+            if (state.closed) {
+              return;
+            }
             if (!analysis || !analysis.success) {
               fail((analysis && analysis.message) || TranslationWizard.lang('eset_translator.requestFailed'));
               return;
@@ -644,7 +677,9 @@ define([
             MultiStepWizard.unlockPrevStep();
             MultiStepWizard.unlockNextStep();
           }).catch(function (error) {
-            fail(TranslationWizard.errorMessage(error), error);
+            if (!state.closed) {
+              fail(TranslationWizard.errorMessage(error), error);
+            }
           });
         });
       }
@@ -710,8 +745,16 @@ define([
 
       MultiStepWizard.lockPrevStep();
       MultiStepWizard.lockNextStep();
+      // Closing the wizard now does not stop the job creation on the server -
+      // the result is still reported, but the (reset) wizard is left alone.
       TranslationWizard.submitJob(data, 'automated').then(function (result) {
         TranslationWizard.notify(result);
+        if (result.success && result.referenceReport && result.referenceReport.length) {
+          TranslationWizard.refreshContent();
+        }
+        if (state.closed) {
+          return;
+        }
         if (!result.success) {
           // Back to the last step so the editor can change the settings.
           MultiStepWizard.unlockPrevStep();
@@ -719,11 +762,11 @@ define([
           return;
         }
         MultiStepWizard.dismiss();
-        if (result.referenceReport && result.referenceReport.length) {
-          TranslationWizard.refreshContent();
-        }
       }).catch(function (error) {
         TranslationWizard.requestFailed(error);
+        if (state.closed) {
+          return;
+        }
         MultiStepWizard.unlockPrevStep();
         MultiStepWizard.triggerStepButton('prev');
       });
@@ -785,6 +828,19 @@ define([
     this.analysis = null;
     this.analysisKey = '';
     this.busy = false;
+    // Set when the editor closes the modal - late responses must not touch
+    // it, and must never dismiss whatever modal is open by then.
+    this.closed = false;
+  };
+
+  /**
+   * Closes exactly this modal (Modal.dismiss() would close the current one,
+   * which may already be another modal).
+   */
+  TranslationWizard.ExchangeSession.prototype.close = function () {
+    if (!this.closed) {
+      this.$modal.trigger('modal-dismiss');
+    }
   };
 
   TranslationWizard.ExchangeSession.prototype.lastStep = function () {
@@ -848,6 +904,9 @@ define([
       }
       this.setBusy(true);
       TranslationWizard.analyze(data).then(function (analysis) {
+        if (self.closed) {
+          return;
+        }
         self.busy = false;
         if (!analysis.success) {
           self.render();
@@ -861,6 +920,9 @@ define([
         self.step = 2;
         self.render();
       }).catch(function (error) {
+        if (self.closed) {
+          return;
+        }
         self.setBusy(false);
         TranslationWizard.requestFailed(error);
       });
@@ -884,22 +946,30 @@ define([
     var data = TranslationWizard.collect(this.$modal.find('[data-eset-pane="export"]'), this.pageUid);
 
     this.setBusy(true);
+    // Closing the modal does not stop the job creation on the server - the
+    // result is always reported; the file is only downloaded while the modal
+    // is still open (otherwise it is in the jobs module).
     TranslationWizard.submitJob(data, 'manual').then(function (result) {
-      self.setBusy(false);
       TranslationWizard.notify(result);
+      if (result.success && result.referenceReport && result.referenceReport.length) {
+        TranslationWizard.refreshContent();
+      }
+      if (self.closed) {
+        return;
+      }
+      self.setBusy(false);
       if (!result.success) {
         return;
       }
-      Modal.dismiss();
+      self.close();
       if (result.downloadUrl) {
         window.location.href = result.downloadUrl;
       }
-      if (result.referenceReport && result.referenceReport.length) {
-        TranslationWizard.refreshContent();
-      }
     }).catch(function (error) {
-      self.setBusy(false);
       TranslationWizard.requestFailed(error);
+      if (!self.closed) {
+        self.setBusy(false);
+      }
     });
   };
 
@@ -912,15 +982,19 @@ define([
     }
     this.setBusy(true);
     promise.then(function (result) {
-      self.setBusy(false);
-      Modal.dismiss();
       TranslationWizard.notify(result);
       if (result && result.success) {
         TranslationWizard.refreshContent();
       }
+      if (!self.closed) {
+        self.setBusy(false);
+        self.close();
+      }
     }).catch(function (error) {
-      self.setBusy(false);
       TranslationWizard.requestFailed(error);
+      if (!self.closed) {
+        self.setBusy(false);
+      }
     });
   };
 
@@ -928,6 +1002,9 @@ define([
     var self = this;
     var $modal = this.$modal;
 
+    $modal.one('hidden.bs.modal', function () {
+      self.closed = true;
+    });
     $modal.on('click', '[data-eset-tab] a', function (event) {
       event.preventDefault();
       self.tab = $(this).closest('[data-eset-tab]').data('eset-tab');
