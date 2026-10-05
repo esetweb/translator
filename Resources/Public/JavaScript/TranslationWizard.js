@@ -41,22 +41,62 @@ define([
 
   // --- helpers ----------------------------------------------------------------
 
+  /**
+   * URL of an AJAX route of this extension. TYPO3 10 caches the backend routes
+   * independently of extension updates: after deploying a version with new
+   * routes, they are missing until the caches are flushed. Without this check
+   * the request would go to ".../undefined" and fail silently.
+   */
+  TranslationWizard.ajaxUrl = function (route) {
+    var urls = (TYPO3.settings && TYPO3.settings.ajaxUrls) || {};
+    if (!urls[route]) {
+      throw new Error(
+        'AJAX route "' + route + '" is not registered. Flush all caches '
+        + '(Install Tool → Maintenance → Flush TYPO3 and PHP Cache) after updating the extension.'
+      );
+    }
+    return urls[route];
+  };
+
+  /**
+   * JSON request to an AJAX route. Always returns a promise - errors (missing
+   * route, HTTP error, no JSON) reject it instead of being thrown.
+   */
+  TranslationWizard.call = function (route, method, data) {
+    return Promise.resolve().then(function () {
+      var request = new AjaxRequest(TranslationWizard.ajaxUrl(route));
+      return method === 'post' ? request.post(data) : request.withQueryArguments(data || {}).get();
+    }).then(function (response) {
+      return response.resolve();
+    });
+  };
+
+  /**
+   * Human readable message for a failed request.
+   */
+  TranslationWizard.errorMessage = function (error) {
+    if (error && error.response && typeof error.response.status === 'number') {
+      // AjaxRequest rejects non-2xx responses with the AjaxResponse
+      return TranslationWizard.lang('eset_translator.requestFailed') + ' (HTTP ' + error.response.status + ')';
+    }
+    if (error instanceof SyntaxError) {
+      return TranslationWizard.lang('eset_translator.noJson',
+        'The server did not answer with JSON - the backend session may have expired (log in again) or the caches need to be flushed.');
+    }
+    if (error && error.message) {
+      return error.message;
+    }
+    return TranslationWizard.lang('eset_translator.requestFailed');
+  };
+
   TranslationWizard.loadOptions = function (pageUid) {
-    return new AjaxRequest(TYPO3.settings.ajaxUrls.eset_translator_options)
-      .withQueryArguments({ page: pageUid })
-      .get()
-      .then(function (response) {
-        return response.resolve();
-      });
+    return TranslationWizard.call('eset_translator_options', 'get', { page: pageUid });
   };
 
   TranslationWizard.analyze = function (data) {
-    return new AjaxRequest(TYPO3.settings.ajaxUrls.eset_translator_analyze)
-      .withQueryArguments({ page: data.page, source: data.source, target: data.target, depth: data.depth || 0 })
-      .get()
-      .then(function (response) {
-        return response.resolve();
-      });
+    return TranslationWizard.call('eset_translator_analyze', 'get', {
+      page: data.page, source: data.source, target: data.target, depth: data.depth || 0
+    });
   };
 
   TranslationWizard.escape = function (value) {
@@ -381,11 +421,7 @@ define([
   TranslationWizard.submitJob = function (data, mode) {
     data.mode = mode;
 
-    return new AjaxRequest(TYPO3.settings.ajaxUrls.eset_translator_create_job)
-      .post(data)
-      .then(function (response) {
-        return response.resolve();
-      });
+    return TranslationWizard.call('eset_translator_create_job', 'post', data);
   };
 
   TranslationWizard.upload = function ($root, pageUid) {
@@ -399,11 +435,16 @@ define([
 
     // Native fetch: TYPO3 v10.4 AjaxRequest cannot transport a multipart body
     // (InputTransformer rebuilds it from Object.keys() and drops the File).
-    return fetch(TYPO3.settings.ajaxUrls.eset_translator_import, {
-      method: 'POST',
-      body: formData,
-      credentials: 'same-origin'
+    return Promise.resolve().then(function () {
+      return fetch(TranslationWizard.ajaxUrl('eset_translator_import'), {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+      });
     }).then(function (response) {
+      if (!response.ok) {
+        throw new Error(TranslationWizard.lang('eset_translator.requestFailed') + ' (HTTP ' + response.status + ')');
+      }
       return response.json();
     });
   };
@@ -426,8 +467,11 @@ define([
     }
   };
 
-  TranslationWizard.requestFailed = function () {
-    Notification.error(TranslationWizard.lang('eset_translator.title'), TranslationWizard.lang('eset_translator.requestFailed'));
+  TranslationWizard.requestFailed = function (error) {
+    if (window.console && error) {
+      window.console.error('[ESET Translator]', error);
+    }
+    Notification.error(TranslationWizard.lang('eset_translator.title'), TranslationWizard.errorMessage(error));
   };
 
   // --- "request": core MultiStepWizard ----------------------------------------
@@ -530,13 +574,31 @@ define([
     MultiStepWizard.addSlide(
       'eset-content',
       title,
-      '<div class="eset-wizard">' + TranslationWizard.stepContentHtml() + '</div>',
+      '<div class="eset-wizard">'
+      + '<div class="eset-step-status"></div>'
+      + TranslationWizard.stepContentHtml()
+      + '</div>',
       Severity.notice,
       TranslationWizard.lang('eset_translator.step.content', 'Content'),
       function ($slide) {
         var $modal = modalOf($slide);
+        var $status = $modal.find('.eset-step-status');
         var data = TranslationWizard.collect($modal, pageUid);
         var key = TranslationWizard.analysisKey(data);
+        // Errors are shown in the slide itself (and as notification) - the
+        // step must never end up locked without a message.
+        var fail = function (message, error) {
+          state.analysis = null;
+          state.analysisKey = '';
+          $status.html('<div class="alert alert-danger">' + TranslationWizard.escape(message) + '</div>');
+          MultiStepWizard.lockNextStep();
+          MultiStepWizard.unlockPrevStep();
+          if (error !== undefined) {
+            TranslationWizard.requestFailed(error);
+          } else {
+            Notification.error(TranslationWizard.lang('eset_translator.title'), message);
+          }
+        };
 
         defer(function () {
           MultiStepWizard.unlockPrevStep();
@@ -546,20 +608,25 @@ define([
           }
           MultiStepWizard.lockNextStep();
           MultiStepWizard.lockPrevStep();
+          $status.html(
+            '<div class="alert alert-info">'
+            + TranslationWizard.escape(TranslationWizard.lang('eset_translator.analyzing', 'Analyzing page content …'))
+            + '</div>'
+          );
           TranslationWizard.analyze(data).then(function (analysis) {
-            MultiStepWizard.unlockPrevStep();
-            if (!analysis.success) {
-              Notification.error(TranslationWizard.lang('eset_translator.title'), analysis.message);
+            if (!analysis || !analysis.success) {
+              fail((analysis && analysis.message) || TranslationWizard.lang('eset_translator.requestFailed'));
               return;
             }
             state.analysis = analysis;
             state.analysisKey = key;
+            $status.empty();
             TranslationWizard.renderContentTypes($modal, analysis.contentTypes);
             TranslationWizard.renderReferences($modal, analysis);
-            MultiStepWizard.unlockNextStep();
-          }).catch(function () {
             MultiStepWizard.unlockPrevStep();
-            TranslationWizard.requestFailed();
+            MultiStepWizard.unlockNextStep();
+          }).catch(function (error) {
+            fail(TranslationWizard.errorMessage(error), error);
           });
         });
       }
@@ -637,8 +704,8 @@ define([
         if (result.referenceReport && result.referenceReport.length) {
           TranslationWizard.refreshContent();
         }
-      }).catch(function () {
-        TranslationWizard.requestFailed();
+      }).catch(function (error) {
+        TranslationWizard.requestFailed(error);
         MultiStepWizard.unlockPrevStep();
         MultiStepWizard.triggerStepButton('prev');
       });
@@ -775,9 +842,9 @@ define([
         TranslationWizard.renderReferences(self.$modal, analysis);
         self.step = 2;
         self.render();
-      }).catch(function () {
+      }).catch(function (error) {
         self.setBusy(false);
-        TranslationWizard.requestFailed();
+        TranslationWizard.requestFailed(error);
       });
       return;
     }
@@ -812,9 +879,9 @@ define([
       if (result.referenceReport && result.referenceReport.length) {
         TranslationWizard.refreshContent();
       }
-    }).catch(function () {
+    }).catch(function (error) {
       self.setBusy(false);
-      TranslationWizard.requestFailed();
+      TranslationWizard.requestFailed(error);
     });
   };
 
@@ -833,9 +900,9 @@ define([
       if (result && result.success) {
         TranslationWizard.refreshContent();
       }
-    }).catch(function () {
+    }).catch(function (error) {
       self.setBusy(false);
-      TranslationWizard.requestFailed();
+      TranslationWizard.requestFailed(error);
     });
   };
 
@@ -943,8 +1010,8 @@ define([
         return;
       }
       TranslationWizard.openExchangeModal(options, pageUid);
-    }).catch(function () {
-      TranslationWizard.requestFailed();
+    }).catch(function (error) {
+      TranslationWizard.requestFailed(error);
     });
   };
 

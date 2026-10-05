@@ -105,6 +105,12 @@
 			<trans-unit id="eset_translator.noProviderForPair">
 				<source>No configured translation provider supports this language pair. Use Export / import instead.</source>
 			</trans-unit>
+			<trans-unit id="eset_translator.analyzing">
+				<source>Analyzing page content …</source>
+			</trans-unit>
+			<trans-unit id="eset_translator.noJson">
+				<source>The server did not answer with JSON - the backend session may have expired (log in again) or the caches need to be flushed.</source>
+			</trans-unit>
 			<trans-unit id="eset_translator.noExchange">
 				<source>You have no permission to export or import translations.</source>
 			</trans-unit>

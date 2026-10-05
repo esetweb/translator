@@ -13,11 +13,13 @@ define([
   'TYPO3/CMS/Backend/Modal',
   'TYPO3/CMS/Backend/Icons',
   'TYPO3/CMS/Backend/Notification',
-  'TYPO3/CMS/Core/Ajax/AjaxRequest'
-], function ($, Modal, Icons, Notification, AjaxRequest) {
+  'TYPO3/CMS/EsetTranslator/TranslationWizard'
+], function ($, Modal, Icons, Notification, TranslationWizard) {
   'use strict';
 
   var POLL_INTERVAL = 3000;
+  // Status polls in a row that may fail before the error is shown.
+  var MAX_STATUS_FAILURES = 3;
   var TITLE = 'ESET Translator';
 
   var JobActions = {};
@@ -38,23 +40,20 @@ define([
   };
 
   JobActions.status = function (uid) {
-    return new AjaxRequest(TYPO3.settings.ajaxUrls.eset_translator_job_status)
-      .withQueryArguments({ jobs: String(uid) })
-      .get()
-      .then(function (response) {
-        return response.resolve();
-      });
+    return TranslationWizard.call('eset_translator_job_status', 'get', { jobs: String(uid) });
   };
 
   /**
    * Waits until the job is no longer queued / running, then reloads the view.
+   * Transient failures are retried a few times; then the error is shown.
    */
-  JobActions.waitForResult = function (uid) {
+  JobActions.waitForResult = function (uid, $button, failures) {
+    failures = failures || 0;
     window.setTimeout(function () {
       JobActions.status(uid).then(function (result) {
         var job = result && result.jobs ? result.jobs[String(uid)] : null;
         if (job && job.active) {
-          JobActions.waitForResult(uid);
+          JobActions.waitForResult(uid, $button, 0);
           return;
         }
         if (job && job.status === 'failed') {
@@ -63,9 +62,13 @@ define([
           Notification.success(TITLE, job.statusLabel);
         }
         window.location.reload();
-      }).catch(function () {
-        // Transient failure (e.g. backend busy): keep waiting.
-        JobActions.waitForResult(uid);
+      }).catch(function (error) {
+        if (failures < MAX_STATUS_FAILURES) {
+          JobActions.waitForResult(uid, $button, failures + 1);
+          return;
+        }
+        JobActions.setBusy($button, false);
+        Notification.error(TITLE, TranslationWizard.errorMessage(error));
       });
     }, POLL_INTERVAL);
   };
@@ -74,11 +77,7 @@ define([
     var uid = parseInt($button.data('eset-run-job'), 10);
     JobActions.setBusy($button, true);
 
-    new AjaxRequest(TYPO3.settings.ajaxUrls.eset_translator_job_run)
-      .post({ job: uid })
-      .then(function (response) {
-        return response.resolve();
-      })
+    TranslationWizard.call('eset_translator_job_run', 'post', { job: uid })
       .then(function (result) {
         if (!result.success) {
           JobActions.setBusy($button, false);
@@ -91,11 +90,11 @@ define([
           window.location.reload();
           return;
         }
-        JobActions.waitForResult(uid);
+        JobActions.waitForResult(uid, $button, 0);
       })
-      .catch(function () {
+      .catch(function (error) {
         JobActions.setBusy($button, false);
-        Notification.error(TITLE, 'The request failed. Please check the TYPO3 log.');
+        TranslationWizard.requestFailed(error);
       });
   };
 
