@@ -100,6 +100,11 @@ class TranslationWizardController
         if ($pageUid <= 0) {
             return $this->error('No page selected.');
         }
+        // Backend group custom module options - without either of them the
+        // editor may not use any of the wizards.
+        if (!$this->permissionService->canRequestTranslation() && !$this->permissionService->canExchangeTranslation()) {
+            return $this->error('Your backend group is not allowed to translate pages.');
+        }
         if (!$this->permissionService->canEditPage($pageUid)) {
             return $this->error('You cannot edit this page, so it cannot be translated here. Translate the copy in a site you have edit access to.');
         }
@@ -199,6 +204,9 @@ class TranslationWizardController
         $depth = max(0, min((int)($params['depth'] ?? 0), $this->configuration->getMaxDepth()));
 
         try {
+            if (!$this->permissionService->canRequestTranslation() && !$this->permissionService->canExchangeTranslation()) {
+                throw new \RuntimeException('Your backend group is not allowed to translate pages.', 1710000182);
+            }
             $source = $this->siteLanguageService->getTarget((string)($params['source'] ?? ''));
             $target = $this->siteLanguageService->getTarget((string)($params['target'] ?? ''));
             $this->permissionService->assertTranslationAllowed($pageUid, $source, $target);
@@ -255,11 +263,13 @@ class TranslationWizardController
             : $request->getQueryParams();
 
         try {
+            $this->permissionService->assertCanExchangeTranslation();
             if (!empty($params['job'])) {
                 $job = $this->jobRepository->findByUid((int)$params['job']);
                 if (!$job instanceof Job) {
                     return $this->error('Unknown job.');
                 }
+                $this->permissionService->assertCanAccessJob($job);
             } else {
                 $params['mode'] = Job::MODE_MANUAL;
                 $job = $this->createJobFromParams($params);
@@ -296,12 +306,17 @@ class TranslationWizardController
         }
 
         $job = null;
-        if (!empty($params['job'])) {
-            $found = $this->jobRepository->findByUid((int)$params['job']);
-            $job = $found instanceof Job ? $found : null;
-        }
-
         try {
+            $this->permissionService->assertCanExchangeTranslation();
+            if (!empty($params['job'])) {
+                $found = $this->jobRepository->findByUid((int)$params['job']);
+                if (!$found instanceof Job) {
+                    return $this->error('Unknown job.');
+                }
+                $this->permissionService->assertCanAccessJob($found);
+                $job = $found;
+            }
+
             $result = $this->importService->importFile(
                 (string)$file->getStream(),
                 (string)$file->getClientFilename(),
@@ -349,7 +364,12 @@ class TranslationWizardController
             $sourceKey = $source->getKey();
         }
 
-        $mode = (string)($params['mode'] ?? Job::MODE_MANUAL);
+        $mode = (string)($params['mode'] ?? Job::MODE_MANUAL) === Job::MODE_AUTOMATED
+            ? Job::MODE_AUTOMATED
+            : Job::MODE_MANUAL;
+        if ($mode === Job::MODE_AUTOMATED) {
+            $this->permissionService->assertCanRequestTranslation();
+        }
         if ($mode === Job::MODE_AUTOMATED && !$this->providerRegistry->hasAnyAvailable()) {
             if (!$this->configuration->isManualFallbackEnabled()) {
                 throw new \RuntimeException(
@@ -358,6 +378,10 @@ class TranslationWizardController
                 );
             }
             $mode = Job::MODE_MANUAL;
+        }
+        // Manual jobs (incl. the fallback) are exports - export permission.
+        if ($mode === Job::MODE_MANUAL) {
+            $this->permissionService->assertCanExchangeTranslation();
         }
 
         $skipCTypes = $params['skipCTypes'] ?? '';

@@ -133,15 +133,17 @@
 									<f:link.action action="show" arguments="{job: job}" class="btn btn-default" title="Details">
 										<core:icon identifier="actions-open" />
 									</f:link.action>
+									<f:if condition="{canExchange}">
 									<f:link.action action="download" arguments="{job: job}" class="btn btn-default" title="Download translation file">
 										<core:icon identifier="actions-download" />
 									</f:link.action>
-									<f:if condition="{job.automated} && {job.processable}">
+									</f:if>
+									<f:if condition="{canRequest} && {job.automated} && {job.processable}">
 										<a href="#" class="btn btn-default" data-eset-run-job="{job.uid}" title="Send to provider now">
 											<core:icon identifier="actions-play" />
 										</a>
 									</f:if>
-									<f:if condition="{job.status} == 'failed'">
+									<f:if condition="{canRequest} && {job.status} == 'failed'">
 										<f:link.action action="requeue" arguments="{job: job}" class="btn btn-default" title="Queue again">
 											<core:icon identifier="actions-refresh" />
 										</f:link.action>

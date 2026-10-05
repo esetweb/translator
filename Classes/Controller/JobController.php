@@ -91,6 +91,10 @@ class JobController extends ActionController
         $view->getModuleTemplate()->getPageRenderer()->loadRequireJsModule(
             'TYPO3/CMS/EsetTranslator/JobActions'
         );
+        // Backend group custom module options - templates show only the
+        // actions the editor may use.
+        $view->assign('canRequest', $this->permissionService->canRequestTranslation());
+        $view->assign('canExchange', $this->permissionService->canExchangeTranslation());
         $view->assign('providersAvailable', $this->providerRegistry->hasAnyAvailable());
         $view->assign('availableProviders', $this->providerRegistry->getAvailable());
     }
@@ -156,6 +160,7 @@ class JobController extends ActionController
     public function downloadAction(Job $job, string $format = ''): string
     {
         $this->assertAccess($job);
+        $this->requirePermission($this->permissionService->canExchangeTranslation(), 'module.permission.exchange', $job);
         if ($format !== '' && $this->formatRegistry->has($format)) {
             $job->setFormat($format);
         }
@@ -174,6 +179,7 @@ class JobController extends ActionController
     public function uploadAction(Job $job): void
     {
         $this->assertAccess($job);
+        $this->requirePermission($this->permissionService->canExchangeTranslation(), 'module.permission.exchange', $job);
         $uploadedFile = $_FILES['tx_esettranslator_eset_esettranslatorjobs']['tmp_name']['file'] ?? '';
         $fileName = $_FILES['tx_esettranslator_eset_esettranslatorjobs']['name']['file'] ?? '';
         if (!is_string($uploadedFile) || $uploadedFile === '' || !is_uploaded_file($uploadedFile)) {
@@ -209,6 +215,7 @@ class JobController extends ActionController
     public function runAction(Job $job): void
     {
         $this->assertAccess($job);
+        $this->requirePermission($this->permissionService->canRequestTranslation(), 'module.permission.request', $job);
         if (!$job->isAutomated()) {
             $this->addFlashMessage($this->translate('module.run.notAutomated'), '', AbstractMessage::WARNING);
             $this->redirect('show', null, null, ['job' => $job]);
@@ -226,6 +233,7 @@ class JobController extends ActionController
     public function requeueAction(Job $job): void
     {
         $this->assertAccess($job);
+        $this->requirePermission($this->permissionService->canRequestTranslation(), 'module.permission.request', $job);
         foreach ($job->getItems() as $item) {
             if ($item->getStatus() === JobItem::STATUS_FAILED) {
                 $item->setStatus(JobItem::STATUS_PENDING);
@@ -259,9 +267,20 @@ class JobController extends ActionController
 
     protected function assertAccess(Job $job): void
     {
-        if (!$this->permissionService->canAccessJob($job)) {
-            throw new \RuntimeException('Access denied to this translation job.', 1710000151);
+        $this->permissionService->assertCanAccessJob($job);
+    }
+
+    /**
+     * Backend group custom module option missing: flash message and back to
+     * the job (redirect() stops the action).
+     */
+    protected function requirePermission(bool $allowed, string $messageKey, Job $job): void
+    {
+        if ($allowed) {
+            return;
         }
+        $this->addFlashMessage($this->translate($messageKey), '', AbstractMessage::ERROR);
+        $this->redirect('show', null, null, ['job' => $job]);
     }
 
     protected function translate(string $key, array $arguments = []): string

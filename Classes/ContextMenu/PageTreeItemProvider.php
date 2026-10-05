@@ -81,13 +81,16 @@ class PageTreeItemProvider extends AbstractProvider
             case 'esetJobs':
                 return $this->getPermissionService()->canReadPage($pageUid);
             case 'esetExchange':
-                // Translation writes into this page - require edit access.
-                return $this->getPermissionService()->canEditPage($pageUid)
+                // Backend group option + edit access (translation writes into
+                // this page).
+                return $this->getPermissionService()->canExchangeTranslation()
+                    && $this->getPermissionService()->canEditPage($pageUid)
                     && $this->getSiteLanguageService()->getSiteForPage($pageUid) !== null
                     && $this->getPermissionService()->getAllowedTargets() !== [];
             case 'esetRequestTranslation':
-                // Automated translation also needs a configured provider.
-                return $this->getProviderRegistry()->hasAnyAvailable()
+                // Backend group option + a configured provider.
+                return $this->getPermissionService()->canRequestTranslation()
+                    && $this->getProviderRegistry()->hasAnyAvailable()
                     && $this->getPermissionService()->canEditPage($pageUid)
                     && $this->getSiteLanguageService()->getSiteForPage($pageUid) !== null
                     && $this->getPermissionService()->getAllowedTargets() !== [];

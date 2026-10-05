@@ -51,6 +51,9 @@ class JobAjaxController
      */
     public function runAction(ServerRequestInterface $request): ResponseInterface
     {
+        if (!$this->permissionService->canRequestTranslation()) {
+            return $this->error('Your backend group is not allowed to request automated translations.');
+        }
         $job = $this->findAccessibleJob((int)(((array)$request->getParsedBody())['job'] ?? 0));
         if ($job === null) {
             return $this->error('Unknown translation job.');

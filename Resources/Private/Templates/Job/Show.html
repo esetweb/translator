@@ -108,26 +108,28 @@
 		<div class="panel-body">
 			<div class="btn-toolbar">
 
-				<div class="btn-group" style="margin-bottom: .5em;">
-					<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-						<core:icon identifier="actions-download" /> Download translation file <span class="caret"></span>
-					</button>
-					<ul class="dropdown-menu">
-						<f:for each="{formats}" as="formatLabel" key="formatId">
-							<li>
-								<f:link.action action="download" arguments="{job: job, format: formatId}">{formatLabel}</f:link.action>
-							</li>
-						</f:for>
-					</ul>
-				</div>
+				<f:if condition="{canExchange}">
+					<div class="btn-group" style="margin-bottom: .5em;">
+						<button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+							<core:icon identifier="actions-download" /> Download translation file <span class="caret"></span>
+						</button>
+						<ul class="dropdown-menu">
+							<f:for each="{formats}" as="formatLabel" key="formatId">
+								<li>
+									<f:link.action action="download" arguments="{job: job, format: formatId}">{formatLabel}</f:link.action>
+								</li>
+							</f:for>
+						</ul>
+					</div>
+				</f:if>
 
-				<f:if condition="{job.automated} && {job.processable}">
+				<f:if condition="{canRequest} && {job.automated} && {job.processable}">
 					<a href="#" class="btn btn-primary" style="margin-bottom: .5em;" data-eset-run-job="{job.uid}">
 						<core:icon identifier="actions-play" /> Send to provider now
 					</a>
 				</f:if>
 
-				<f:if condition="{job.status} == 'failed'">
+				<f:if condition="{canRequest} && {job.status} == 'failed'">
 					<f:link.action action="requeue" arguments="{job: job}" class="btn btn-default" style="margin-bottom: .5em;">
 						<core:icon identifier="actions-refresh" /> Queue again
 					</f:link.action>
@@ -147,18 +149,20 @@
 				</f:link.action>
 			</div>
 
-			<hr />
+			<f:if condition="{canExchange}">
+				<hr />
 
-			<f:form action="upload" arguments="{job: job}" enctype="multipart/form-data" additionalAttributes="{class: 'form-inline'}">
-				<div class="form-group">
-					<label>Import translated file&nbsp;</label>
-					<f:form.upload name="file" additionalAttributes="{accept: '.xlf,.xliff,.xml'}" />
-				</div>
-				<f:form.button class="btn btn-warning">
-					<core:icon identifier="actions-upload" /> Import
-				</f:form.button>
-				<p class="help-block">Upload the file you received back from the translation agency (XLIFF or CATXML).</p>
-			</f:form>
+				<f:form action="upload" arguments="{job: job}" enctype="multipart/form-data" additionalAttributes="{class: 'form-inline'}">
+					<div class="form-group">
+						<label>Import translated file&nbsp;</label>
+						<f:form.upload name="file" additionalAttributes="{accept: '.xlf,.xliff,.xml'}" />
+					</div>
+					<f:form.button class="btn btn-warning">
+						<core:icon identifier="actions-upload" /> Import
+					</f:form.button>
+					<p class="help-block">Upload the file you received back from the translation agency (XLIFF or CATXML).</p>
+				</f:form>
+			</f:if>
 		</div>
 	</div>
 

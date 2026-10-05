@@ -342,22 +342,76 @@ class PermissionService
         return $GLOBALS['BE_USER'] ?? null;
     }
 
+    /**
+     * Backend group: Access Lists → Custom module options → ESET Translator →
+     * "Request automated translation".
+     */
     public function canRequestTranslation(): bool
     {
         return $this->checkCustomOption('requestTranslation');
     }
 
+    /**
+     * Backend group: Access Lists → Custom module options → ESET Translator →
+     * "Export / import translation".
+     */
     public function canExchangeTranslation(): bool
     {
         return $this->checkCustomOption('exchangeTranslation');
     }
 
+    /**
+     * Server side guard for every automated-translation entry point.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertCanRequestTranslation(): void
+    {
+        if (!$this->canRequestTranslation()) {
+            throw new \RuntimeException(
+                'Your backend group is not allowed to request automated translations.',
+                1710000180
+            );
+        }
+    }
+
+    /**
+     * Server side guard for every export / import entry point.
+     *
+     * @throws \RuntimeException
+     */
+    public function assertCanExchangeTranslation(): void
+    {
+        if (!$this->canExchangeTranslation()) {
+            throw new \RuntimeException(
+                'Your backend group is not allowed to export or import translations.',
+                1710000181
+            );
+        }
+    }
+
+    /**
+     * @throws \RuntimeException
+     */
+    public function assertCanAccessJob(Job $job): void
+    {
+        if (!$this->canAccessJob($job)) {
+            throw new \RuntimeException('Access denied to this translation job.', 1710000151);
+        }
+    }
+
     protected function checkCustomOption(string $itemKey): bool
     {
-        $backendUser = $GLOBALS['BE_USER'] ?? null;
+        $backendUser = $this->getBackendUser();
         if ($backendUser === null) {
             return false;
         }
+        // check() is false for admins without groups (no groupData), so admins
+        // are let through explicitly.
+        if ($backendUser->isAdmin()) {
+            return true;
+        }
+
         return (bool)$backendUser->check('custom_options', 'tx_esettranslator:' . $itemKey);
     }
 }
